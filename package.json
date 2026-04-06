@@ -67,6 +67,8 @@
     "build": "vite build",
     "typecheck": "vue-tsc --noEmit",
     "test": "bun test",
+    "bench": "bun run benchmarks/navigation-bench.ts",
+    "bench:size": "bun run benchmarks/bundle-size-check.ts",
     "dev:example": "vite --config examples/vite.config.ts examples",
     "prepublishOnly": "bun run build"
   }
