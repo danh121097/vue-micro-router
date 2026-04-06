@@ -35,7 +35,11 @@ export function useGlobalMicroRouter(
 ): MicroRouterStore {
   const tracker = usePageTracker(config.tracker);
   const navigation = useNavigation(
-    { defaultPath: config.defaultPath, stepDelay: config.stepDelay },
+    {
+      defaultPath: config.defaultPath,
+      stepDelay: config.stepDelay,
+      guards: config.guards
+    },
     tracker
   );
   const dialogs = useDialogManager(tracker);

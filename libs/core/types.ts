@@ -8,6 +8,23 @@
  */
 import type { AsyncComponentLoader, Component, ComputedRef, Ref } from 'vue';
 
+// ── Navigation Guards ─────────────────────────────────────────────────────────
+
+/**
+ * Guard called before navigation. Return false (or resolve to false) to cancel.
+ * @param to - target path
+ * @param from - current path
+ */
+export type NavigationGuard = (
+  to: string,
+  from: string,
+) => boolean | Promise<boolean>;
+
+/**
+ * Hook called after navigation completes. Cannot cancel — purely observational.
+ */
+export type NavigationAfterHook = (to: string, from: string) => void;
+
 // ── Enums & Literals ──────────────────────────────────────────────────────────
 
 export type TransitionType = 'fade' | 'slide' | 'scale';
@@ -25,6 +42,14 @@ export interface MicroRoute {
   attrs?: Record<string, unknown>;
   /** Background music track name — resolved by audio manager's urlResolver */
   bgm?: string;
+  /** Page transition type: 'slide' (default), 'fade', or 'none' to disable */
+  transition?: TransitionType | 'none';
+  /** Custom transition duration in ms. Defaults: slide=500ms, fade=300ms */
+  transitionDuration?: number;
+  /** Guard called before navigating TO this route. Return false to cancel. */
+  beforeEnter?: NavigationGuard;
+  /** Guard called before navigating AWAY from this route. Return false to cancel. */
+  beforeLeave?: NavigationGuard;
   /** Internal: cache key for transition identity */
   key?: string;
   /** Internal: incremented to force full component remount */
@@ -109,6 +134,11 @@ export interface MicroRouterConfig {
   defaultControlName: string;
   /** Name of the onboarding control (exempt from auto-restore). Optional — only needed for onboarding flows. */
   onboardingControlName?: string;
+  /** Navigation guard hooks — beforeEach runs before every navigation, afterEach runs after */
+  guards?: {
+    beforeEach?: NavigationGuard[];
+    afterEach?: NavigationAfterHook[];
+  };
   /** Analytics hooks for page/dialog/control enter/leave events */
   tracker?: PageTrackerHooks;
   /** Reactive volume ref (0-100) for audio manager. Only used with vue-micro-router/audio */
