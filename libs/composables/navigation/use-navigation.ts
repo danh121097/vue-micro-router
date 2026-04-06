@@ -351,16 +351,7 @@ export function useNavigation(
   // ── History tracking (opt-in) ──────────────────────────────────────────────
 
   const navHistory = historyConfig.enabled
-    ? createNavigationHistory(historyConfig, async (path) => {
-        // History navigation runs guards (auth state may have changed since recording)
-        const fromPath = normalizePath(state.activePath);
-        const hasGlobalGuards = (guardConfig.beforeEach?.length ?? 0) > 0;
-        if (hasGlobalGuards || registry.routes.size > 0) {
-          const allowed = await executeGuardPipeline(path, fromPath, guardConfig, guardContext);
-          if (!allowed) return;
-        }
-        await pushCore(path);
-      })
+    ? createNavigationHistory(historyConfig, (path) => push(path))
     : undefined;
 
   // Record initial path if history is enabled
