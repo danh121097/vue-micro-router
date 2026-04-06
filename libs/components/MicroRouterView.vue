@@ -36,10 +36,32 @@ const hasSharedSegments = computed(() => {
   return fromSegments.some((s) => toSegments.includes(s));
 });
 const showGUI = computed(() => resolveControls.value.length > 0);
+
+/**
+ * Per-route transition: uses the target (topmost) route's transition config.
+ * Defaults to 'slide' if not specified. 'none' disables CSS transitions entirely.
+ */
+const activeTransition = computed(() => {
+  const topRoute = resolveRoutes.value.at(-1);
+  return topRoute?.transition ?? 'slide';
+});
+
+const transitionName = computed(() => {
+  if (activeTransition.value === 'none') return '';
+  return activeTransition.value === 'fade' ? 'page-fade' : 'page-slide';
+});
+
+const transitionDuration = computed(() => {
+  const topRoute = resolveRoutes.value.at(-1);
+  if (topRoute?.transitionDuration) return topRoute.transitionDuration;
+  return activeTransition.value === 'fade' ? 300 : 500;
+});
+
+const useCss = computed(() => hasSharedSegments.value && activeTransition.value !== 'none');
 </script>
 
 <template>
-  <TransitionGroup name="page-slide" :css="hasSharedSegments">
+  <TransitionGroup :name="transitionName" :css="useCss">
     <RoutePage
       v-for="(route, i) in resolveRoutes"
       :key="route.key || route.path"
@@ -48,8 +70,8 @@ const showGUI = computed(() => resolveControls.value.length > 0);
         deactive: resolveRoutes.length > 1 && i !== resolveRoutes.length - 1
       }"
       :style="{
-        transition: hasSharedSegments
-          ? 'transform .5s cubic-bezier(0.65, 0, 0.35, 1)'
+        transition: useCss
+          ? `transform ${transitionDuration}ms cubic-bezier(0.65, 0, 0.35, 1), opacity ${transitionDuration}ms ease`
           : 'none',
         zIndex: i
       }"
