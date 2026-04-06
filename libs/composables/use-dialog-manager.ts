@@ -61,9 +61,11 @@ export function useDialogManager(
   });
 
   const resolveDialogs = computed<MicroDialog[]>(() => {
-    return Array.from(state.dialogs.values()).filter(
-      (d) => d.activated || d.closing
-    );
+    const result: MicroDialog[] = [];
+    for (const d of state.dialogs.values()) {
+      if (d.activated || d.closing) result.push(d);
+    }
+    return result;
   });
 
   const safeTimeout = timers.schedule;

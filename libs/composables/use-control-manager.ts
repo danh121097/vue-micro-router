@@ -54,18 +54,22 @@ export function useControlManager(
     new Map<string, Record<string, unknown>>()
   );
 
-  const resolveControls = computed<MicroControl[]>(() => {
-    return Array.from(controls.values()).filter((c) => c.activated);
+  /** Single iteration over controls — all derived computeds read from this */
+  const activeControls = computed(() => {
+    const result: MicroControl[] = [];
+    for (const ctrl of controls.values()) {
+      if (ctrl.activated) result.push(ctrl);
+    }
+    return result;
   });
-  const activeControl = computed(() => {
-    return Array.from(controls.values()).some(
-      (c) => c.activated && c.name !== defaultName
-    );
-  });
-  const currentControl = computed(() => {
-    const active = Array.from(controls.values()).find((c) => c.activated);
-    return active?.name ?? defaultName;
-  });
+
+  const resolveControls = computed<MicroControl[]>(() => activeControls.value);
+  const activeControl = computed(() =>
+    activeControls.value.some((c) => c.name !== defaultName)
+  );
+  const currentControl = computed(() =>
+    activeControls.value[0]?.name ?? defaultName
+  );
 
   function toggleControl(
     name: string,
