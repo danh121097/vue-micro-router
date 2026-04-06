@@ -249,9 +249,22 @@ export function useNavigation(
     // Absolute path
     if (dest.startsWith('/')) {
       const segments = parsePathSegments(dest);
-      const lastSegment = segments.at(-1);
       const currentSegments = parsePathSegments(state.activePath);
-      if (lastSegment && currentSegments.includes(lastSegment)) {
+
+      // Detect if this is a back-navigation (target is prefix of current)
+      const isBackNav = segments.length < currentSegments.length &&
+        segments.every((seg, i) => currentSegments[i] === seg);
+
+      if (isBackNav) {
+        // Use navigateBack for clean slide-out animation
+        navigateBack(currentSegments.length - segments.length, props);
+        return;
+      }
+
+      // Only bump routeKey when re-navigating to the SAME last segment at same depth
+      // (forces remount). Don't bump when navigating to a new deeper path.
+      const lastSegment = segments.at(-1);
+      if (lastSegment && currentSegments.at(-1) === lastSegment) {
         state.routeKeys.set(
           lastSegment,
           (state.routeKeys.get(lastSegment) || 0) + 1
