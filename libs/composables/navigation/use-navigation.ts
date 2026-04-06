@@ -146,20 +146,15 @@ export function useNavigation(
       state.routeAttrs.delete(segment);
     });
 
-    // Apply props to target segment (the page we're going back to)
+    // Apply props to target segment and force remount when props are passed
     const newTopSegment = targetSegments.at(-1);
-    if (newTopSegment) {
-      if (props) {
-        const existing = state.routeAttrs.get(newTopSegment);
-        state.routeAttrs.set(newTopSegment, { ...existing, ...props });
-      }
-      // Only force remount when props are passed
-      if (props) {
-        state.componentKeys.set(
-          newTopSegment,
-          (state.componentKeys.get(newTopSegment) || 0) + 1
-        );
-      }
+    if (newTopSegment && props) {
+      const existing = state.routeAttrs.get(newTopSegment);
+      state.routeAttrs.set(newTopSegment, { ...existing, ...props });
+      state.componentKeys.set(
+        newTopSegment,
+        (state.componentKeys.get(newTopSegment) || 0) + 1
+      );
     }
 
     const prevPath = state.activePath;

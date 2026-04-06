@@ -173,10 +173,8 @@ describe('useNavigation', () => {
     await nav.push('a');
     await new Promise((r) => setTimeout(r, 20));
     await nav.stepWiseBack(1);
-    // stepWiseBack(1) does stepsBack = 0, no-op since 0 >= 1 is false
-    // Actually steps=1 -> stepsBack = abs(1)-1 = 0, 0 >= segments is false, so it enters but loop runs 0 times
-    // Wait, let me re-check: steps < 1 returns early. steps=1 passes. stepsBack = 0. loop 0 times. Does nothing.
-    expect(nav.activePath.value).toBe('/home/a');
+    // stepWiseBack(1) goes back 1 step — from /home/a to /home
+    expect(nav.activePath.value).toBe('/home');
   });
 
   test('stepWiseBack multiple steps', async () => {

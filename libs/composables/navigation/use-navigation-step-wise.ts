@@ -100,15 +100,16 @@ export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigati
 
   async function stepWiseBack(steps: number) {
     if (steps < 1 || ctx.isLocked()) return;
-    const stepsBack = Math.abs(steps) - 1;
     const currentSegments = parsePathSegments(ctx.getActivePath());
-    if (stepsBack >= currentSegments.length) return;
+    // Clamp to available segments (keep at least root)
+    const actualSteps = Math.min(steps, currentSegments.length - 1);
+    if (actualSteps < 1) return;
 
     ctx.lock();
     try {
       // Run guards for the final destination before stepping back
       if (ctx.runGuards) {
-        const targetSegments = currentSegments.slice(0, -stepsBack);
+        const targetSegments = currentSegments.slice(0, currentSegments.length - actualSteps);
         const targetPath = buildPathFromSegments(targetSegments);
         const fromPath = normalizePath(ctx.getActivePath());
         const allowed = await ctx.runGuards(targetPath, fromPath);
@@ -118,9 +119,9 @@ export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigati
         }
       }
 
-      for (let i = 0; i < stepsBack; i++) {
+      for (let i = 0; i < actualSteps; i++) {
         await ctx.pushCore(-1);
-        if (i < stepsBack - 1) await delay(betweenStepDelay);
+        if (i < actualSteps - 1) await delay(betweenStepDelay);
       }
       ctx.scheduleUnlock();
     } catch (e) {

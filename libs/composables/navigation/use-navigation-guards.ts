@@ -10,6 +10,7 @@
  * Guards have a configurable timeout (default 5s) to prevent infinite awaits.
  */
 import type { MicroRoute, NavigationAfterHook, NavigationGuard } from '../../core/types';
+import { getLastSegment } from '../../utils/path-utils';
 
 const DEFAULT_GUARD_TIMEOUT = 5000;
 
@@ -85,7 +86,7 @@ export async function executeGuardPipeline(
   }
 
   // 2. Target route's beforeEnter guard
-  const toSegment = to.split('/').filter(Boolean).at(-1);
+  const toSegment = getLastSegment(to);
   if (toSegment) {
     const targetRoute = ctx.getRoute(toSegment);
     if (targetRoute?.beforeEnter) {
@@ -95,7 +96,7 @@ export async function executeGuardPipeline(
   }
 
   // 3. Source route's beforeLeave guard
-  const fromSegment = from.split('/').filter(Boolean).at(-1);
+  const fromSegment = getLastSegment(from);
   if (fromSegment) {
     const sourceRoute = ctx.getRoute(fromSegment);
     if (sourceRoute?.beforeLeave) {

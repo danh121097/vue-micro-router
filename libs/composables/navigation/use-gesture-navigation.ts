@@ -77,8 +77,9 @@ export function useGestureNavigation(
     currentPage = current;
     prevPage = previous;
 
-    // Capture pointer to keep receiving events even if pointer leaves the element
-    (e.target as HTMLElement)?.setPointerCapture?.(e.pointerId);
+    // Capture pointer on container to keep receiving events even if child elements change
+    const container = resolveElement();
+    container?.setPointerCapture?.(e.pointerId);
 
     currentPage.style.willChange = 'transform';
     if (prevPage) {
@@ -112,6 +113,8 @@ export function useGestureNavigation(
 
   function onPointerUp(e: PointerEvent) {
     if (!tracking || !currentPage) return;
+    // Validate DOM refs are still connected (Vue may have re-rendered)
+    if (!currentPage.isConnected) { resetStyles(); tracking = false; return; }
 
     const deltaX = e.clientX - startX;
     const elapsed = Date.now() - startTime;
