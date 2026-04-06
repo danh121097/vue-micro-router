@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import { useGlobalMicroRouter } from '../composables/use-micro-router';
+import { useGestureNavigation } from '../composables/use-gesture-navigation';
 import { registerFeaturePlugins } from '../plugins/feature-plugin-manager';
 import type { FeaturePlugin, MicroRouterConfig } from '../core/types';
 import MicroControlWrapper from './MicroControlWrapper.vue';
@@ -12,6 +13,8 @@ interface Props {
   /** Required config — must provide defaultPath and defaultControlName */
   config: MicroRouterConfig;
   plugins?: FeaturePlugin[];
+  /** Mark as a nested router — each nested instance has its own independent page/dialog/control state */
+  nested?: boolean;
 }
 
 const props = defineProps<Props>();
@@ -29,6 +32,9 @@ const {
   toPath,
   closeDialog
 } = store;
+
+// Gesture navigation ref (must be before computed per SFC ordering convention)
+const pageContainerRef = ref<HTMLElement | null>(null);
 
 const hasSharedSegments = computed(() => {
   const fromSegments = fromPath.value.split('/').filter(Boolean);
@@ -58,10 +64,19 @@ const transitionDuration = computed(() => {
 });
 
 const useCss = computed(() => hasSharedSegments.value && activeTransition.value !== 'none');
+
+// Gesture navigation (swipe-back from left edge)
+if (props.config.gesture?.enabled) {
+  useGestureNavigation(props.config.gesture, {
+    containerRef: pageContainerRef,
+    goBack: () => store.push(-1),
+    canGoBack: () => resolveRoutes.value.length > 1
+  });
+}
 </script>
 
 <template>
-  <TransitionGroup :name="transitionName" :css="useCss">
+  <TransitionGroup ref="pageContainerRef" :name="transitionName" :css="useCss">
     <RoutePage
       v-for="(route, i) in resolveRoutes"
       :key="route.key || route.path"

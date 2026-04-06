@@ -46,12 +46,14 @@ export type {
 
 // ── Constants ──
 export {
+  createRouterKey,
   MICRO_ATTRS_READ_KEY,
   MICRO_ATTRS_WRITE_KEY,
   MICRO_CONTROL_NAME_KEY,
   MICRO_DIALOG_PATH_KEY,
   MICRO_ROUTE_PATH_KEY,
   MICRO_ROUTER_KEY,
+  MICRO_ROUTER_ROOT_KEY,
   STEP_DELAY
 } from './core/constants';
 
@@ -71,6 +73,8 @@ export type { ControlLifecycleHooks } from './composables/use-control-lifecycle'
 export { usePageTracker } from './composables/use-page-tracker';
 export { useNavigation } from './composables/use-navigation';
 export type { NavigationState } from './composables/use-navigation';
+export { useGestureNavigation } from './composables/use-gesture-navigation';
+export type { GestureConfig } from './composables/use-gesture-navigation';
 export { useDialogManager } from './composables/use-dialog-manager';
 export type { DialogManagerState } from './composables/use-dialog-manager';
 export { useControlManager } from './composables/use-control-manager';
