@@ -17,7 +17,7 @@ Build apps that feel like native mobile — pages slide in/out with smooth trans
 | State passing | Query params / route params | Reactive `useMicroState()` bridge |
 | Navigation history | Browser history API | Built-in `canGoBack` / `historyBack()` |
 | Gesture navigation | None | Swipe-back from left edge |
-| Type safety | Route params typing | Full `useMicroRouter<AppRoutes>()` |
+| Type safety | Route params typing | Auto-typed via `Register` + `useMicroRouter()` |
 | State persistence | None | `serialize()` / `restore()` |
 | Nested routers | Nested `<router-view>` | Independent `<MicroRouterView nested>` |
 | Lifecycle hooks | `beforeRouteEnter` etc. | `onRouteEnter`, `onDialogEnter`, `onControlEnter` |
@@ -220,24 +220,50 @@ History truncates forward entries on new push (browser behavior).
 
 ### Type-Safe Routes
 
-Opt-in TypeScript safety for route names and props:
+#### Register pattern (recommended — declare once, typed everywhere)
 
 ```ts
-// Define your route map
+// app-plugin.ts — declare your plugin type once
+export const appPlugin = defineFeaturePlugin({
+  name: 'my-app',
+  routes: [
+    { path: 'home', component: HomePage },
+    { path: 'profile', component: ProfilePage },
+  ],
+  dialogs: [{ path: 'confirm', component: ConfirmDialog, activated: false }],
+  controls: [{ name: 'main_hud', component: MainHUD, activated: false }],
+} as const);
+
+// Register globally — this is the only place you write the type
+declare module 'vue-micro-router' {
+  interface Register {
+    plugin: typeof appPlugin;
+  }
+}
+```
+
+```ts
+// Any component — no generic needed, fully typed automatically
+const { push, openDialog, toggleControl } = useMicroRouter();
+push('profile');                    // ✅ OK
+push('typo');                       // ❌ TS Error
+openDialog('confirm');              // ✅ OK
+toggleControl('main_hud', true);    // ✅ OK
+```
+
+#### Manual route map (for typed props)
+
+```ts
 interface AppRoutes {
   home: undefined;
   profile: { userId: number };
-  settings: { tab?: string };
 }
-
-// Typed router — push validates route names and props
 const router = useMicroRouter<AppRoutes>();
 router.push('profile', { userId: 42 }); // OK
 router.push('profile');                  // TS Error: missing props
-router.push('typo');                     // TS Error: not in AppRoutes
 ```
 
-Untyped usage (`useMicroRouter()` without generic) still works.
+Both patterns work. Untyped `useMicroRouter()` without Register still returns `MicroRouterStore`.
 
 ### State Serialization
 
@@ -509,7 +535,7 @@ Includes page slide/fade transitions, dialog animations, control fade transition
 |-----------|-------------|
 | `useGlobalMicroRouter(config?)` | Create & provide store. Call once in root. |
 | `useMicroRouter(options?)` | Inject store. Pass `{ root: true }` for root in nested setups. |
-| `useMicroRouter<T>()` | Typed version — validates route names and props at compile time. |
+| `useMicroRouter()` | Auto-typed via `Register` augmentation. Explicit `<T>` generic also supported. |
 | `useMicroState<T>(defaults?)` | Reactive attrs bridge — read/write props in routes, dialogs, controls. |
 | `useRouteLifecycle(hooks)` | `onRouteEnter` / `onRouteLeave` — fires when page becomes/stops being top. |
 | `useDialogLifecycle(hooks)` | `onDialogEnter` / `onDialogLeave` — fires when dialog becomes/stops being topmost. |

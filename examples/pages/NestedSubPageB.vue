@@ -1,14 +1,15 @@
 <script setup lang="ts">
 /**
  * Nested sub-page B — second page in the nested router stack.
- * Demonstrates: nested back nav vs root router escape via { root: true }.
+ * Demonstrates: typed nested nav + root router escape.
  */
 import { useMicroRouter } from '../../libs/index';
+import type { nestedPlugin } from './nested-demo-plugin';
 
-// Nearest (nested) router — back only affects the nested stack
-const { push } = useMicroRouter();
+// Nested router — explicit generic for 'sub-a' | 'sub-b' autocomplete
+const { push } = useMicroRouter<typeof nestedPlugin>();
 
-// Root (parent) router — escapes the nested context entirely
+// Root router — auto-typed via Register ('home' | 'settings' | ... autocomplete)
 const root = useMicroRouter({ root: true });
 </script>
 

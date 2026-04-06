@@ -3,9 +3,8 @@
  * Main HUD control — persistent overlay with navigation, history, and state controls.
  */
 import { useMicroRouter } from '../../libs/index';
-import type { AppPlugin } from '../app-plugin';
 
-// Type-safe store — validates route/dialog/control names at compile time
+// Auto-typed via Register — validates route/dialog/control names at compile time
 const {
   activePage,
   push,
@@ -15,7 +14,7 @@ const {
   historyBack,
   historyForward,
   serialize,
-} = useMicroRouter<AppPlugin>();
+} = useMicroRouter();
 
 function saveState() {
   if (!serialize) return;
@@ -31,10 +30,18 @@ function saveState() {
 
       <!-- History back/forward -->
       <div class="hud-history">
-        <button class="hud-btn icon-btn" :class="{ disabled: !canGoBack }" :disabled="!canGoBack"
-          title="History back" @click="historyBack && historyBack()">←</button>
-        <button class="hud-btn icon-btn" :class="{ disabled: !canGoForward }" :disabled="!canGoForward"
-          title="History forward" @click="historyForward && historyForward()">→</button>
+        <button
+          class="hud-btn icon-btn" :class="{ disabled: !canGoBack }" :disabled="!canGoBack"
+          title="History back" @click="historyBack && historyBack()"
+        >
+          ←
+        </button>
+        <button
+          class="hud-btn icon-btn" :class="{ disabled: !canGoForward }" :disabled="!canGoForward"
+          title="History forward" @click="historyForward && historyForward()"
+        >
+          →
+        </button>
       </div>
 
       <span class="hud-page">{{ activePage }}</span>

@@ -5,9 +5,14 @@ import { usePageTracker } from '../libs/composables/use-page-tracker';
 
 const fakeComponent = { render: () => null };
 
-function createControlManager(config: { defaultControlName?: string; onboardingControlName?: string } = {}) {
+function createControlManager(
+  config: { defaultControlName?: string; onboardingControlName?: string } = {}
+) {
   const tracker = usePageTracker();
-  return useControlManager({ defaultControlName: config.defaultControlName ?? 'main_gui', ...config }, tracker);
+  return useControlManager(
+    { defaultControlName: config.defaultControlName ?? 'main_gui', ...config },
+    tracker
+  );
 }
 
 describe('useControlManager', () => {
@@ -20,7 +25,11 @@ describe('useControlManager', () => {
 
   test('registerControl adds to registry', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     expect(cm.resolveControls.value).toHaveLength(0);
   });
 
@@ -28,7 +37,7 @@ describe('useControlManager', () => {
     const cm = createControlManager();
     cm.registerControls([
       { name: 'main_gui', component: fakeComponent, activated: false },
-      { name: 'inventory', component: fakeComponent, activated: false },
+      { name: 'inventory', component: fakeComponent, activated: false }
     ]);
     expect(cm.resolveControls.value).toHaveLength(0);
   });
@@ -37,14 +46,26 @@ describe('useControlManager', () => {
     const cm = createControlManager();
     const warnSpy = mock(() => {});
     console.warn = warnSpy;
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     expect(warnSpy).toHaveBeenCalled();
   });
 
   test('toggleControl activates control', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     expect(cm.resolveControls.value).toHaveLength(1);
     expect(cm.currentControl.value).toBe('main_gui');
@@ -52,7 +73,11 @@ describe('useControlManager', () => {
 
   test('toggleControl deactivates control', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     cm.toggleControl('main_gui', false);
     expect(cm.resolveControls.value).toHaveLength(0);
@@ -60,8 +85,16 @@ describe('useControlManager', () => {
 
   test('activating non-default deactivates default GUI', async () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'inventory', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'inventory',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     // Wait for isProcessing guard to release
     await new Promise((r) => setTimeout(r, 350));
@@ -74,8 +107,16 @@ describe('useControlManager', () => {
 
   test('deactivating non-default restores default GUI', async () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'inventory', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'inventory',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     await new Promise((r) => setTimeout(r, 350));
     cm.toggleControl('inventory', true);
@@ -86,8 +127,16 @@ describe('useControlManager', () => {
 
   test('activating main_gui deactivates non-default controls', async () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'inventory', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'inventory',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('inventory', true);
     await new Promise((r) => setTimeout(r, 350));
     cm.toggleControl('main_gui', true);
@@ -98,7 +147,11 @@ describe('useControlManager', () => {
 
   test('toggleControl with attrs', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true, { mode: 'compact' });
     expect(cm.getControlAttrs('main_gui')).toEqual({ mode: 'compact' });
   });
@@ -111,8 +164,16 @@ describe('useControlManager', () => {
 
   test('activation is guarded against rapid calls', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'a', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'b', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'a',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'b',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('a', true);
     cm.toggleControl('b', true); // Should be blocked by isProcessing
     expect(cm.resolveControls.value).toHaveLength(1);
@@ -121,7 +182,11 @@ describe('useControlManager', () => {
 
   test('deactivation is not guarded', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'a', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'a',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('a', true);
     // Deactivation should work even during processing
     cm.toggleControl('a', false);
@@ -145,7 +210,7 @@ describe('useControlManager', () => {
   test('custom control names from config', () => {
     const cm = createControlManager({
       defaultControlName: 'hud',
-      onboardingControlName: 'tutorial',
+      onboardingControlName: 'tutorial'
     });
     expect(cm.currentControl.value).toBe('hud');
   });
@@ -159,8 +224,12 @@ describe('useControlManager', () => {
     const trackGuiEnter = mock(() => {});
     const trackGuiLeave = mock(() => {});
     const tracker = usePageTracker({ trackGuiEnter, trackGuiLeave });
-    const cm = useControlManager({}, tracker);
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    const cm = useControlManager({ defaultControlName: 'main_gui' }, tracker);
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     expect(trackGuiEnter).toHaveBeenCalledWith('main_gui');
     cm.toggleControl('main_gui', false);
@@ -169,13 +238,24 @@ describe('useControlManager', () => {
 
   test('onboarding control does not auto-restore default', () => {
     const cm = createControlManager();
-    cm.registerControl({ name: 'onboarding_main_gui', component: fakeComponent, activated: false });
-    cm.registerControl({ name: 'inventory', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'onboarding_main_gui',
+      component: fakeComponent,
+      activated: false
+    });
+    cm.registerControl({
+      name: 'inventory',
+      component: fakeComponent,
+      activated: false
+    });
     // Set default to onboarding
-    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.registerControl({
+      name: 'main_gui',
+      component: fakeComponent,
+      activated: false
+    });
     cm.toggleControl('main_gui', true);
     // The name check for onboarding is on updatedDefaultGUI.name
     // This tests the onboarding exception path
   });
 });
-

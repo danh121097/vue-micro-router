@@ -48,7 +48,10 @@ export type {
   PluginTypedPush,
   PluginTypedOpenDialog,
   PluginTypedCloseDialog,
-  PluginTypedToggleControl
+  PluginTypedToggleControl,
+  Register,
+  RegisteredPlugin,
+  ResolvedMicroRouterStore
 } from './core/type-helpers';
 
 // ── Constants ──

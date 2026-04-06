@@ -86,3 +86,65 @@ export interface PluginTypedToggleControl<Controls extends string> {
  * - RouteMap is Record<string, ...>
  */
 export type IsPluginConfig<T> = T extends { name: string } ? true : false;
+
+// ── Module Augmentation — Register pattern ──────────────────────────────────
+//
+// Declare your plugin type ONCE, then useMicroRouter() auto-infers everywhere.
+//
+// ```ts
+// // env.d.ts or app-plugin.ts — declare once
+// declare module 'vue-micro-router' {
+//   interface Register {
+//     plugin: typeof appPlugin;
+//   }
+// }
+//
+// // Any component — no generic needed
+// const { push } = useMicroRouter();
+// push('home');      // ✅ type-safe
+// push('unknown');   // ❌ compile error
+// ```
+
+/**
+ * Module augmentation interface. Users extend this to register their plugin type.
+ * Accepts `plugin` (single or union of plugins) or `routeMap` (manual RouteMap).
+ */
+ 
+export interface Register {}
+
+/** Resolved plugin type from Register — `never` if not augmented */
+export type RegisteredPlugin =
+  Register extends { plugin: infer T } ? T : never;
+
+/** Resolved route map from Register — `never` if not augmented */
+export type RegisteredRouteMap =
+  Register extends { routeMap: infer T extends RouteMap } ? T : never;
+
+/** True if user has augmented Register with a plugin */
+export type HasRegisteredPlugin = [RegisteredPlugin] extends [never] ? false : true;
+
+/** True if user has augmented Register with a route map */
+export type HasRegisteredRouteMap = [RegisteredRouteMap] extends [never] ? false : true;
+
+/**
+ * Auto-resolved store type based on Register augmentation.
+ * Priority: plugin > routeMap > untyped MicroRouterStore
+ *
+ * Defined inline (no circular import back to use-micro-router.ts).
+ */
+export type ResolvedMicroRouterStore =
+  HasRegisteredPlugin extends true
+    ? Omit<
+        import('./types').MicroRouterStore,
+        'push' | 'openDialog' | 'closeDialog' | 'toggleControl'
+      > & {
+        push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin>>;
+        openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin>>;
+        closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<RegisteredPlugin>>;
+        toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin>>;
+      }
+    : HasRegisteredRouteMap extends true
+      ? Omit<import('./types').MicroRouterStore, 'push'> & {
+          push: TypedPush<RegisteredRouteMap>;
+        }
+      : import('./types').MicroRouterStore;

@@ -88,7 +88,8 @@ if (props.config.gesture?.enabled) {
         transition: useCss
           ? `transform ${transitionDuration}ms cubic-bezier(0.65, 0, 0.35, 1), opacity ${transitionDuration}ms ease`
           : 'none',
-        zIndex: i
+        zIndex: i,
+        '--mr-page-height': nested ? '100%' : '100dvh',
       }"
     >
       <component

@@ -1,8 +1,8 @@
 /**
- * App plugin definition — exported so its type can be used with useMicroRouter<typeof appPlugin>().
+ * App plugin definition — type registered globally via module augmentation.
  *
- * Using `as const` on the config preserves literal path/name types,
- * enabling type-safe push/openDialog/toggleControl across all components.
+ * Using `as const` preserves literal path/name types.
+ * Register pattern: declare once → useMicroRouter() auto-typed everywhere.
  */
 import { defineFeaturePlugin } from '../libs/index';
 
@@ -32,5 +32,15 @@ export const appPlugin = defineFeaturePlugin({
   controls: [{ name: 'main_hud', component: MainHUD, activated: false }]
 } as const);
 
-/** Plugin type — use with useMicroRouter<AppPlugin>() for type-safe store */
+/** Plugin type — registered globally so useMicroRouter() is auto-typed */
 export type AppPlugin = typeof appPlugin;
+
+/**
+ * Module augmentation — declare once, typed everywhere.
+ * After this, useMicroRouter() returns a fully typed store without generics.
+ */
+declare module '../libs/index' {
+  interface Register {
+    plugin: AppPlugin;
+  }
+}

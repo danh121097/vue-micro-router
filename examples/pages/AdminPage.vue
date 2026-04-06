@@ -24,7 +24,7 @@ const { push } = useMicroRouter();
 
     <div class="auth-toggle">
       <label>
-        <input type="checkbox" v-model="isAuthenticated" />
+        <input v-model="isAuthenticated" type="checkbox" />
         Authenticated (controls authGuard)
       </label>
     </div>

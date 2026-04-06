@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /**
  * Nested sub-page A — first page in the nested router stack.
- * Demonstrates independent navigation within a nested MicroRouterView.
+ * Demonstrates typed nested navigation via explicit generic.
  */
 import { useMicroRouter } from '../../libs/index';
+import type { nestedPlugin } from './nested-demo-plugin';
 
-const { push } = useMicroRouter();
+// Explicit generic for nested router — 'sub-a' | 'sub-b' autocomplete
+const { push } = useMicroRouter<typeof nestedPlugin>();
 </script>
 
 <template>

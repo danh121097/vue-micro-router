@@ -52,7 +52,7 @@ function showSerializedState() {
     <div class="actions">
       <button @click="push(-1)">← Back</button>
       <button @click="toggleTheme">Toggle Theme</button>
-      <button class="btn-save" @click="saveSettings" :disabled="!hasUnsavedChanges">Save</button>
+      <button class="btn-save" :disabled="!hasUnsavedChanges" @click="saveSettings">Save</button>
       <button @click="stepWisePush('profile')">Step-wise → Profile</button>
     </div>
 
@@ -64,10 +64,10 @@ function showSerializedState() {
       <h3>beforeLeave Guard</h3>
       <p>Toggle theme (marks unsaved), then navigate away — a confirmation prompt appears.</p>
       <code class="block">// In route config or useRouteLifecycle
-beforeLeave: (to, from) => {
-  if (hasUnsavedChanges) return confirm('Leave?');
-  return true;
-}</code>
+        beforeLeave: (to, from) => {
+        if (hasUnsavedChanges) return confirm('Leave?');
+        return true;
+        }</code>
     </div>
 
     <div v-if="serializedPreview" class="serialized-output">

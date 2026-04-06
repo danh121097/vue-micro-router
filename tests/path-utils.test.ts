@@ -72,7 +72,7 @@ describe('getLastSegment', () => {
 
 describe('isAsyncLoader', () => {
   test('returns true for arrow function (async loader)', () => {
-    const loader = () => import('../src/types');
+    const loader = () => import('../libs/core/types');
     expect(isAsyncLoader(loader)).toBe(true);
   });
 

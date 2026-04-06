@@ -26,15 +26,19 @@ import type {
   ExtractRoutePaths,
   ExtractDialogPaths,
   ExtractControlNames,
-  IsPluginConfig,
   PluginTypedPush,
   PluginTypedOpenDialog,
   PluginTypedCloseDialog,
-  PluginTypedToggleControl
+  PluginTypedToggleControl,
+  ResolvedMicroRouterStore
 } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './control/use-control-manager';
-import { setupDevtoolsPlugin, emitDevtoolsEvent, refreshDevtoolsInspector } from '../devtools/devtools-plugin';
+import {
+  setupDevtoolsPlugin,
+  emitDevtoolsEvent,
+  refreshDevtoolsInspector
+} from '../devtools/devtools-plugin';
 import { serializeState, restoreState } from './use-state-serializer';
 import { useDialogManager } from './dialog/use-dialog-manager';
 import { useNavigation } from './navigation/use-navigation';
@@ -85,13 +89,15 @@ export function useGlobalMicroRouter(
     preloadRoute: navigation.preloadRoute,
 
     // History (conditional — only if enabled)
-    ...(navigation.history ? {
-      canGoBack: navigation.history.canGoBack,
-      canGoForward: navigation.history.canGoForward,
-      historyBack: navigation.history.back,
-      historyForward: navigation.history.forward,
-      historyGo: navigation.history.go,
-    } : {}),
+    ...(navigation.history
+      ? {
+          canGoBack: navigation.history.canGoBack,
+          canGoForward: navigation.history.canGoForward,
+          historyBack: navigation.history.back,
+          historyForward: navigation.history.forward,
+          historyGo: navigation.history.go
+        }
+      : {}),
 
     // Dialogs
     activeDialog: dialogs.activeDialog,
@@ -170,7 +176,10 @@ export function useGlobalMicroRouter(
 }
 
 /** Typed store from manual RouteMap — push() validates route names + props */
-export type TypedMicroRouterStore<T extends RouteMap> = Omit<MicroRouterStore, 'push'> & {
+export type TypedMicroRouterStore<T extends RouteMap> = Omit<
+  MicroRouterStore,
+  'push'
+> & {
   push: TypedPush<T>;
 };
 
@@ -196,23 +205,22 @@ export interface UseMicroRouterOptions {
 /**
  * Inject the MicroRouter store from a parent MicroRouterView.
  *
- * @example Untyped (default)
+ * @example Auto-typed via Register (recommended — declare once, typed everywhere)
  * ```ts
- * const store = useMicroRouter();
+ * // env.d.ts — declare once
+ * declare module 'vue-micro-router' {
+ *   interface Register { plugin: typeof appPlugin }
+ * }
+ *
+ * // Any component — no generic needed
+ * const { push } = useMicroRouter();
+ * push('shop');              // ✅ type-safe
+ * push('unknown');           // ❌ compile error
  * ```
  *
- * @example Typed from plugin (recommended — zero duplication)
+ * @example Explicit generic (override or without Register)
  * ```ts
- * const plugin = defineFeaturePlugin({ ... } as const);
  * const store = useMicroRouter<typeof plugin>();
- * store.push('shop');              // OK
- * store.openDialog('buy-confirm'); // OK
- * store.toggleControl('hud', true); // OK
- * ```
- *
- * @example Multiple plugins
- * ```ts
- * const store = useMicroRouter<typeof shopPlugin | typeof authPlugin>();
  * ```
  *
  * @example Manual RouteMap (for typed props)
@@ -222,10 +230,18 @@ export interface UseMicroRouterOptions {
  * store.push('profile', { userId: 42 }); // OK
  * ```
  */
-export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore;
-export function useMicroRouter<T extends RouteMap>(options?: UseMicroRouterOptions): TypedMicroRouterStore<T>;
-export function useMicroRouter<T extends { name: string }>(options?: UseMicroRouterOptions): PluginTypedMicroRouterStore<T>;
-export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore {
+export function useMicroRouter(
+  options?: UseMicroRouterOptions
+): ResolvedMicroRouterStore;
+export function useMicroRouter<T extends RouteMap>(
+  options?: UseMicroRouterOptions
+): TypedMicroRouterStore<T>;
+export function useMicroRouter<T extends { name: string }>(
+  options?: UseMicroRouterOptions
+): PluginTypedMicroRouterStore<T>;
+export function useMicroRouter(
+  options?: UseMicroRouterOptions
+): MicroRouterStore {
   const key = options?.root ? MICRO_ROUTER_ROOT_KEY : MICRO_ROUTER_KEY;
   const store = inject(key);
   if (!store) {
@@ -233,8 +249,8 @@ export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStor
       options?.root
         ? '[vue-micro-router] useMicroRouter({ root: true }) failed — no root <MicroRouterView> found.'
         : '[vue-micro-router] useMicroRouter() must be called inside <MicroRouterView>. ' +
-          'Did you forget to wrap your app with <MicroRouterView>?'
+            'Did you forget to wrap your app with <MicroRouterView>?'
     );
   }
-  return store as any;
+  return store;
 }
