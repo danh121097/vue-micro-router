@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 
-import { useNavigation } from '../libs/composables/use-navigation';
+import { useNavigation } from '../libs/composables/navigation/use-navigation';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
 
 function createNav(config: { defaultPath?: string; stepDelay?: number } = {}) {

@@ -10,8 +10,8 @@ import {
   type AsyncComponentLoader
 } from 'vue';
 
-import type { MicroRoute } from '../core/types';
-import { isAsyncLoader, safeMarkRaw, warmLoaderCache } from '../utils/path-utils';
+import type { MicroRoute } from '../../core/types';
+import { isAsyncLoader, safeMarkRaw, warmLoaderCache } from '../../utils/path-utils';
 
 export interface RouteRegistry {
   /** Registered route definitions keyed by segment name */

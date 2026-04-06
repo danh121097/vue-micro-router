@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 
-import { useNavigation } from '../libs/composables/use-navigation';
+import { useNavigation } from '../libs/composables/navigation/use-navigation';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
 import type { NavigationGuard } from '../libs/core/types';
 

@@ -22,11 +22,11 @@ import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY, createRouterKey } from '../cor
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
 import type { RouteMap, TypedPush } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
-import { useControlManager } from './use-control-manager';
+import { useControlManager } from './control/use-control-manager';
 import { setupDevtoolsPlugin, emitDevtoolsEvent, refreshDevtoolsInspector } from '../devtools/devtools-plugin';
 import { serializeState, restoreState } from './use-state-serializer';
-import { useDialogManager } from './use-dialog-manager';
-import { useNavigation } from './use-navigation';
+import { useDialogManager } from './dialog/use-dialog-manager';
+import { useNavigation } from './navigation/use-navigation';
 import { usePageTracker } from './use-page-tracker';
 
 /**

@@ -21,9 +21,9 @@ import type {
   DialogProps,
   MicroDialog,
   PageTrackerHooks
-} from '../core/types';
-import { isAsyncLoader, safeMarkRaw } from '../utils/path-utils';
-import { createTimerManager } from '../utils/timer-manager';
+} from '../../core/types';
+import { isAsyncLoader, safeMarkRaw } from '../../utils/path-utils';
+import { createTimerManager } from '../../utils/timer-manager';
 
 export interface DialogManagerState {
   activeDialog: ComputedRef<string>;

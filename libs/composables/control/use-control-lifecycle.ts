@@ -14,8 +14,8 @@
  */
 import { inject, onMounted, watch } from 'vue';
 
-import { MICRO_CONTROL_NAME_KEY } from '../core/constants';
-import { useMicroRouter } from './use-micro-router';
+import { MICRO_CONTROL_NAME_KEY } from '../../core/constants';
+import { useMicroRouter } from '../use-micro-router';
 
 export interface ControlLifecycleHooks {
   /** Called when this control becomes the active control */

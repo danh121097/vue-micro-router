@@ -10,8 +10,8 @@ import {
   buildPathFromSegments,
   normalizePath,
   parsePathSegments
-} from '../utils/path-utils';
-import { delay } from '../utils/timer-manager';
+} from '../../utils/path-utils';
+import { delay } from '../../utils/timer-manager';
 
 interface StepWiseContext {
   /** Read current active path */

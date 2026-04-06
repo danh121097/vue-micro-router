@@ -18,16 +18,16 @@ import {
   type ComputedRef
 } from 'vue';
 
-import { STEP_DELAY } from '../core/constants';
-import type { MicroRoute, PageTrackerHooks } from '../core/types';
+import { STEP_DELAY } from '../../core/constants';
+import type { MicroRoute, PageTrackerHooks } from '../../core/types';
 import {
   buildPathFromSegments,
   getLastSegment,
   normalizePath,
   parsePathSegments,
   warmLoaderCache
-} from '../utils/path-utils';
-import { createTimerManager } from '../utils/timer-manager';
+} from '../../utils/path-utils';
+import { createTimerManager } from '../../utils/timer-manager';
 import { executeAfterHooks, executeGuardPipeline, type GuardConfig } from './use-navigation-guards';
 import { createNavigationHistory, type NavigationHistory, type NavigationHistoryConfig } from './use-navigation-history';
 import { createRouteRegistry } from './use-route-registry';

@@ -9,7 +9,7 @@
  * If any guard returns false or rejects, navigation is aborted.
  * Guards have a configurable timeout (default 5s) to prevent infinite awaits.
  */
-import type { MicroRoute, NavigationAfterHook, NavigationGuard } from '../core/types';
+import type { MicroRoute, NavigationAfterHook, NavigationGuard } from '../../core/types';
 
 const DEFAULT_GUARD_TIMEOUT = 5000;
 

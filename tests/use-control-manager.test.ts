@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 
-import { useControlManager } from '../libs/composables/use-control-manager';
+import { useControlManager } from '../libs/composables/control/use-control-manager';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
 
 const fakeComponent = { render: () => null };

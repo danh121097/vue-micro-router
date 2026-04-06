@@ -6,8 +6,8 @@
  */
 import { inject, onMounted, watch } from 'vue';
 
-import { MICRO_ROUTE_PATH_KEY } from '../core/constants';
-import { useMicroRouter } from './use-micro-router';
+import { MICRO_ROUTE_PATH_KEY } from '../../core/constants';
+import { useMicroRouter } from '../use-micro-router';
 
 export interface RouteLifecycleHooks {
   onRouteEnter?: () => void;

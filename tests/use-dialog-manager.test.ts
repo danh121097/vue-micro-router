@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'bun:test';
 
-import { useDialogManager } from '../libs/composables/use-dialog-manager';
+import { useDialogManager } from '../libs/composables/dialog/use-dialog-manager';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
 
 function createDialogManager() {

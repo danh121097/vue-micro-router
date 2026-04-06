@@ -14,8 +14,8 @@
  */
 import { inject, onMounted, watch } from 'vue';
 
-import { MICRO_DIALOG_PATH_KEY } from '../core/constants';
-import { useMicroRouter } from './use-micro-router';
+import { MICRO_DIALOG_PATH_KEY } from '../../core/constants';
+import { useMicroRouter } from '../use-micro-router';
 
 export interface DialogLifecycleHooks {
   /** Called when this dialog becomes the active (topmost) dialog */

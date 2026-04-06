@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 
 import { useGlobalMicroRouter } from '../composables/use-micro-router';
-import { useGestureNavigation } from '../composables/use-gesture-navigation';
+import { useGestureNavigation } from '../composables/navigation/use-gesture-navigation';
 import { registerFeaturePlugins } from '../plugins/feature-plugin-manager';
 import type { FeaturePlugin, MicroRouterConfig } from '../core/types';
 import MicroControlWrapper from './MicroControlWrapper.vue';

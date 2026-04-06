@@ -64,21 +64,21 @@ export {
 } from './composables/use-micro-router';
 export type { TypedMicroRouterStore } from './composables/use-micro-router';
 export { useMicroState } from './composables/use-micro-state';
-export { useRouteLifecycle } from './composables/use-route-lifecycle';
-export type { RouteLifecycleHooks } from './composables/use-route-lifecycle';
-export { useDialogLifecycle } from './composables/use-dialog-lifecycle';
-export type { DialogLifecycleHooks } from './composables/use-dialog-lifecycle';
-export { useControlLifecycle } from './composables/use-control-lifecycle';
-export type { ControlLifecycleHooks } from './composables/use-control-lifecycle';
+export { useRouteLifecycle } from './composables/navigation/use-route-lifecycle';
+export type { RouteLifecycleHooks } from './composables/navigation/use-route-lifecycle';
+export { useDialogLifecycle } from './composables/dialog/use-dialog-lifecycle';
+export type { DialogLifecycleHooks } from './composables/dialog/use-dialog-lifecycle';
+export { useControlLifecycle } from './composables/control/use-control-lifecycle';
+export type { ControlLifecycleHooks } from './composables/control/use-control-lifecycle';
 export { usePageTracker } from './composables/use-page-tracker';
-export { useNavigation } from './composables/use-navigation';
-export type { NavigationState } from './composables/use-navigation';
-export { useGestureNavigation } from './composables/use-gesture-navigation';
-export type { GestureConfig } from './composables/use-gesture-navigation';
-export { useDialogManager } from './composables/use-dialog-manager';
-export type { DialogManagerState } from './composables/use-dialog-manager';
-export { useControlManager } from './composables/use-control-manager';
-export type { ControlManagerState } from './composables/use-control-manager';
+export { useNavigation } from './composables/navigation/use-navigation';
+export type { NavigationState } from './composables/navigation/use-navigation';
+export { useGestureNavigation } from './composables/navigation/use-gesture-navigation';
+export type { GestureConfig } from './composables/navigation/use-gesture-navigation';
+export { useDialogManager } from './composables/dialog/use-dialog-manager';
+export type { DialogManagerState } from './composables/dialog/use-dialog-manager';
+export { useControlManager } from './composables/control/use-control-manager';
+export type { ControlManagerState } from './composables/control/use-control-manager';
 
 // ── Components ──
 export { default as MicroRouterView } from './components/MicroRouterView.vue';

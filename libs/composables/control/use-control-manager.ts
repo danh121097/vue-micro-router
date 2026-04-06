@@ -13,9 +13,9 @@ import {
   type ComputedRef
 } from 'vue';
 
-import type { MicroControl, PageTrackerHooks } from '../core/types';
-import { isAsyncLoader, safeMarkRaw } from '../utils/path-utils';
-import { createTimerManager } from '../utils/timer-manager';
+import type { MicroControl, PageTrackerHooks } from '../../core/types';
+import { isAsyncLoader, safeMarkRaw } from '../../utils/path-utils';
+import { createTimerManager } from '../../utils/timer-manager';
 
 interface ControlManagerConfig {
   defaultControlName: string;
