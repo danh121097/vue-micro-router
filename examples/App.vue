@@ -11,11 +11,11 @@
  *   - State serialization
  *   - Devtools (auto-enabled in dev mode)
  */
-import { ref } from 'vue';
 import { MicroRouterView, defineFeaturePlugin } from '../libs/index';
 import type { NavigationGuard } from '../libs/index';
 import '../libs/styles/index.css';
 
+import { isAuthenticated } from './auth-state';
 import HomePage from './pages/HomePage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 import ProfilePage from './pages/ProfilePage.vue';
@@ -23,9 +23,6 @@ import AdminPage from './pages/AdminPage.vue';
 import NestedDemoPage from './pages/NestedDemoPage.vue';
 import ConfirmDialog from './dialogs/ConfirmDialog.vue';
 import MainHUD from './controls/MainHUD.vue';
-
-/** Simulated auth state — toggle in AdminPage to test guard behavior */
-export const isAuthenticated = ref(false);
 
 const appPlugin = defineFeaturePlugin({
   name: 'showcase-app',

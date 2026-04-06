@@ -6,7 +6,7 @@
  *   - Auth state toggle for testing guard behavior
  */
 import { useMicroRouter } from '../../libs/index';
-import { isAuthenticated } from '../App.vue';
+import { isAuthenticated } from '../auth-state';
 
 const { push } = useMicroRouter();
 </script>
