@@ -33,8 +33,16 @@ export type {
   NavigationAfterHook,
   NavigationGuard,
   PageTrackerHooks,
+  SerializedState,
   TransitionType
 } from './core/types';
+
+export type {
+  RouteMap,
+  RoutesWithProps,
+  RoutesWithoutProps,
+  TypedPush
+} from './core/type-helpers';
 
 // ── Constants ──
 export {
@@ -52,6 +60,7 @@ export {
   useGlobalMicroRouter,
   useMicroRouter
 } from './composables/use-micro-router';
+export type { TypedMicroRouterStore } from './composables/use-micro-router';
 export { useMicroState } from './composables/use-micro-state';
 export { useRouteLifecycle } from './composables/use-route-lifecycle';
 export type { RouteLifecycleHooks } from './composables/use-route-lifecycle';
