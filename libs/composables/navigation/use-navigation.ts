@@ -351,7 +351,21 @@ export function useNavigation(
   // ── History tracking (opt-in) ──────────────────────────────────────────────
 
   const navHistory = historyConfig.enabled
-    ? createNavigationHistory(historyConfig, (path) => push(path))
+    ? createNavigationHistory(historyConfig, async (targetPath) => {
+        // Detect back navigation: target is a prefix/subset of current path
+        const currentSegments = parsePathSegments(state.activePath);
+        const targetSegments = parsePathSegments(targetPath);
+        const isBackNav = targetSegments.length < currentSegments.length &&
+          targetSegments.every((seg, i) => currentSegments[i] === seg);
+
+        if (isBackNav) {
+          // Use push(-N) for clean back animation (removes pages from top)
+          const stepsBack = currentSegments.length - targetSegments.length;
+          await push(-stepsBack);
+        } else {
+          await push(targetPath);
+        }
+      })
     : undefined;
 
   // Record initial path if history is enabled
