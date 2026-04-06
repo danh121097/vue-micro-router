@@ -28,7 +28,7 @@ export default defineConfig({
       fileName: (_, entryName) => `${entryName}.mjs`,
     },
     rollupOptions: {
-      external: ['vue', 'howler'],
+      external: ['vue', 'howler', '@vue/devtools-api'],
       output: {
         globals: {
           vue: 'Vue',

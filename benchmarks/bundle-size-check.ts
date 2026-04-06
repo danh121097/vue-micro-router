@@ -8,7 +8,7 @@ import { statSync } from 'fs';
 import { gzipSync } from 'zlib';
 import { readFileSync } from 'fs';
 
-const THRESHOLD_KB = 9.5; // 8.45kB post-Phase 2 baseline + ~12% headroom
+const THRESHOLD_KB = 11.5; // 10.6kB post-Phase 3 baseline + ~8% headroom
 
 // Build first
 console.log('Building...');
