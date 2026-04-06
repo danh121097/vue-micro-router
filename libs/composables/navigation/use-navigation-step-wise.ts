@@ -28,8 +28,10 @@ interface StepWiseContext {
   unlock: () => void;
   /** Check if navigation is currently locked */
   isLocked: () => boolean;
-  /** Delay between step transitions in ms */
+  /** Delay for push lock cooldown in ms */
   stepDelay: number;
+  /** Delay between step-wise transitions — should be >= animation duration. Defaults to stepDelay * 1.2 */
+  stepWiseDelay?: number;
 }
 
 export interface StepWiseNavigation {
@@ -38,6 +40,8 @@ export interface StepWiseNavigation {
 }
 
 export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigation {
+  /** Delay between each step — longer than push lock to let animation fully complete */
+  const betweenStepDelay = ctx.stepWiseDelay ?? Math.max(ctx.stepDelay * 1.2, ctx.stepDelay + 100);
   async function stepWisePush(
     targetPath: string,
     props?: Record<string, unknown>
@@ -70,7 +74,7 @@ export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigati
           if (ctx.getActivePath() === intermediate) continue;
           const isLast = i === targetSegments.length - 1;
           await ctx.pushCore(intermediate, isLast ? props : undefined);
-          if (!isLast) await delay(ctx.stepDelay);
+          if (!isLast) await delay(betweenStepDelay);
         }
       } else {
         const toAdd = targetSegments.filter(
@@ -84,7 +88,7 @@ export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigati
         for (let i = 0; i < toAdd.length; i++) {
           const isLast = i === toAdd.length - 1;
           await ctx.pushCore(toAdd[i]!, isLast ? props : undefined);
-          if (!isLast) await delay(ctx.stepDelay);
+          if (!isLast) await delay(betweenStepDelay);
         }
       }
       ctx.scheduleUnlock();
@@ -116,7 +120,7 @@ export function createStepWiseNavigation(ctx: StepWiseContext): StepWiseNavigati
 
       for (let i = 0; i < stepsBack; i++) {
         await ctx.pushCore(-1);
-        if (i < stepsBack - 1) await delay(ctx.stepDelay);
+        if (i < stepsBack - 1) await delay(betweenStepDelay);
       }
       ctx.scheduleUnlock();
     } catch (e) {

@@ -44,5 +44,9 @@ export const MICRO_ATTRS_WRITE_KEY: InjectionKey<
   (attrs: Record<string, unknown>) => void
 > = Symbol('micro-attrs-write');
 
-/** Default delay (ms) between step-wise navigation transitions and navigation lock release */
-export const STEP_DELAY = 600;
+/**
+ * Default delay (ms) between step-wise navigation transitions and navigation lock release.
+ * Must be >= the longest page transition (500ms slide) + buffer for Vue DOM patching.
+ * Too short = overlapping animations. Too long = sluggish feel.
+ */
+export const STEP_DELAY = 550;

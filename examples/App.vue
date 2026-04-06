@@ -29,15 +29,11 @@ const appPlugin = defineFeaturePlugin({
   routes: [
     {
       path: 'home',
-      component: HomePage,
-      transition: 'slide',
-      transitionDuration: 400,
+      component: HomePage
     },
     {
       path: 'settings',
-      component: SettingsPage,
-      transition: 'fade',
-      transitionDuration: 300,
+      component: SettingsPage
     },
     {
       path: 'profile',
@@ -47,26 +43,20 @@ const appPlugin = defineFeaturePlugin({
       beforeEnter: (_to, _from) => {
         console.log('[Guard] Allowing profile entry');
         return true;
-      },
+      }
     },
     {
       path: 'admin',
-      component: AdminPage,
-      transition: 'none',
+      component: AdminPage
     },
     {
       path: 'nested',
       component: NestedDemoPage,
-      transition: 'slide',
-      preload: 'eager',
-    },
+      preload: 'eager'
+    }
   ],
-  dialogs: [
-    { path: 'confirm', component: ConfirmDialog, activated: false },
-  ],
-  controls: [
-    { name: 'main_hud', component: MainHUD, activated: false },
-  ],
+  dialogs: [{ path: 'confirm', component: ConfirmDialog, activated: false }],
+  controls: [{ name: 'main_hud', component: MainHUD, activated: false }]
 });
 
 /** Global guard — blocks admin page unless authenticated */
@@ -92,14 +82,22 @@ const analyticsHook = (to: string, from: string) => {
       gesture: { enabled: true, edgeWidth: 30, threshold: 0.3 },
       guards: {
         beforeEach: [authGuard],
-        afterEach: [analyticsHook],
-      },
+        afterEach: [analyticsHook]
+      }
     }"
     :plugins="[appPlugin]"
   />
 </template>
 
 <style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+body {
+  font-family: system-ui, sans-serif;
+  background: #0f172a;
+  color: #e2e8f0;
+}
 </style>
