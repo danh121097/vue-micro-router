@@ -20,8 +20,10 @@ import {
 
 import { MICRO_ROUTER_KEY } from '../core/constants';
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
+import type { RouteMap, TypedPush } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './use-control-manager';
+import { serializeState, restoreState } from './use-state-serializer';
 import { useDialogManager } from './use-dialog-manager';
 import { useNavigation } from './use-navigation';
 import { usePageTracker } from './use-page-tracker';
@@ -38,7 +40,8 @@ export function useGlobalMicroRouter(
     {
       defaultPath: config.defaultPath,
       stepDelay: config.stepDelay,
-      guards: config.guards
+      guards: config.guards,
+      history: config.history
     },
     tracker
   );
@@ -68,6 +71,15 @@ export function useGlobalMicroRouter(
     updateRouteAttrs: navigation.updateRouteAttrs,
     getRouteAttrs: navigation.getRouteAttrs,
 
+    // History (conditional — only if enabled)
+    ...(navigation.history ? {
+      canGoBack: navigation.history.canGoBack,
+      canGoForward: navigation.history.canGoForward,
+      historyBack: navigation.history.back,
+      historyForward: navigation.history.forward,
+      historyGo: navigation.history.go,
+    } : {}),
+
     // Dialogs
     activeDialog: dialogs.activeDialog,
     fromDialog: dialogs.fromDialog,
@@ -89,7 +101,11 @@ export function useGlobalMicroRouter(
     registerControl: controls.registerControl,
     registerControls: controls.registerControls,
     getControlAttrs: controls.getControlAttrs,
-    updateControlAttrs: controls.updateControlAttrs
+    updateControlAttrs: controls.updateControlAttrs,
+
+    // Serialization
+    serialize: () => serializeState(store),
+    restore: (state) => restoreState(store, state)
   };
 
   // Cross-concern: navigation → controls (gui leave/enter on page change)
@@ -128,10 +144,31 @@ export function useGlobalMicroRouter(
   return store;
 }
 
+/** Typed store — replaces push() with type-safe overloads when a RouteMap generic is provided */
+export type TypedMicroRouterStore<T extends RouteMap> = Omit<MicroRouterStore, 'push'> & {
+  push: TypedPush<T>;
+};
+
 /**
  * Inject the MicroRouter store from a parent MicroRouterView.
  * Must be called within the MicroRouterView component tree.
+ *
+ * @example Untyped (default)
+ * ```ts
+ * const router = useMicroRouter();
+ * router.push('page', { any: 'props' });
+ * ```
+ *
+ * @example Typed (opt-in)
+ * ```ts
+ * interface AppRoutes { home: undefined; profile: { userId: number } }
+ * const router = useMicroRouter<AppRoutes>();
+ * router.push('profile', { userId: 42 }); // OK
+ * router.push('typo');                     // TS error
+ * ```
  */
+export function useMicroRouter(): MicroRouterStore;
+export function useMicroRouter<T extends RouteMap>(): TypedMicroRouterStore<T>;
 export function useMicroRouter(): MicroRouterStore {
   const store = inject(MICRO_ROUTER_KEY);
   if (!store) {
@@ -140,5 +177,5 @@ export function useMicroRouter(): MicroRouterStore {
         'Did you forget to wrap your app with <MicroRouterView>?'
     );
   }
-  return store;
+  return store as any;
 }

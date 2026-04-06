@@ -29,6 +29,7 @@ import {
 } from '../utils/path-utils';
 import { createTimerManager } from '../utils/timer-manager';
 import { executeAfterHooks, executeGuardPipeline, type GuardConfig } from './use-navigation-guards';
+import { createNavigationHistory, type NavigationHistory, type NavigationHistoryConfig } from './use-navigation-history';
 import { createRouteRegistry } from './use-route-registry';
 import { createStepWiseNavigation } from './use-navigation-step-wise';
 
@@ -36,6 +37,7 @@ interface NavigationConfig {
   defaultPath: string;
   stepDelay?: number;
   guards?: GuardConfig;
+  history?: NavigationHistoryConfig;
 }
 
 export interface NavigationState {
@@ -59,6 +61,8 @@ export interface NavigationState {
   registerRoutes: (routes: MicroRoute[]) => void;
   updateRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
+  /** Navigation history (only populated when config.history.enabled) */
+  history?: NavigationHistory;
   cleanup: () => void;
 }
 
@@ -69,6 +73,7 @@ export function useNavigation(
   const defaultPath = config.defaultPath;
   const stepDelay = config.stepDelay ?? STEP_DELAY;
   const guardConfig = config.guards ?? {};
+  const historyConfig = config.history ?? {};
   const timers = createTimerManager();
   const registry = createRouteRegistry();
 
@@ -300,6 +305,9 @@ export function useNavigation(
       await pushCore(destination, props);
       const toPath = normalizePath(state.activePath);
 
+      // Record history entry after successful navigation
+      navHistory?.record(toPath, props);
+
       // Fire afterEach hooks (non-blocking)
       executeAfterHooks(toPath, fromPath, guardConfig.afterEach);
 
@@ -311,6 +319,26 @@ export function useNavigation(
       throw e;
     }
   }
+
+  // ── Step-wise navigation (delegated) ──────────────────────────────────────
+
+  // ── History tracking (opt-in) ──────────────────────────────────────────────
+
+  const navHistory = historyConfig.enabled
+    ? createNavigationHistory(historyConfig, async (path) => {
+        // History navigation runs guards (auth state may have changed since recording)
+        const fromPath = normalizePath(state.activePath);
+        const hasGlobalGuards = (guardConfig.beforeEach?.length ?? 0) > 0;
+        if (hasGlobalGuards || registry.routes.size > 0) {
+          const allowed = await executeGuardPipeline(path, fromPath, guardConfig, guardContext);
+          if (!allowed) return;
+        }
+        await pushCore(path);
+      })
+    : undefined;
+
+  // Record initial path if history is enabled
+  if (navHistory) navHistory.record(normalizePath(defaultPath));
 
   // ── Step-wise navigation (delegated) ──────────────────────────────────────
 
@@ -340,6 +368,7 @@ export function useNavigation(
     registerRoutes: registry.registerRoutes,
     updateRouteAttrs,
     getRouteAttrs,
+    history: navHistory,
     cleanup: timers.cleanup
   };
 }

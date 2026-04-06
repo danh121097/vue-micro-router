@@ -134,6 +134,12 @@ export interface MicroRouterConfig {
   defaultControlName: string;
   /** Name of the onboarding control (exempt from auto-restore). Optional — only needed for onboarding flows. */
   onboardingControlName?: string;
+  /** Navigation history tracking — opt-in, records sequence of paths visited */
+  history?: {
+    enabled?: boolean;
+    /** Max entries before FIFO eviction. Default: 50 */
+    maxEntries?: number;
+  };
   /** Navigation guard hooks — beforeEach runs before every navigation, afterEach runs after */
   guards?: {
     beforeEach?: NavigationGuard[];
@@ -143,6 +149,27 @@ export interface MicroRouterConfig {
   tracker?: PageTrackerHooks;
   /** Reactive volume ref (0-100) for audio manager. Only used with vue-micro-router/audio */
   volumeRef?: Ref<number>;
+}
+
+// ── Serialized State ─────────────────────────────────────────────────────────
+
+export interface SerializedState {
+  /** Schema version for future migration support */
+  version: 1;
+  navigation: {
+    activePath: string;
+    routeAttrs: Record<string, Record<string, unknown>>;
+  };
+  dialogs: {
+    /** Open dialog paths in stack order */
+    stack: string[];
+    attrs: Record<string, Record<string, unknown>>;
+  };
+  controls: {
+    /** Active control names */
+    active: string[];
+    attrs: Record<string, Record<string, unknown>>;
+  };
 }
 
 // ── Feature Plugin ────────────────────────────────────────────────────────────
@@ -241,6 +268,24 @@ export interface MicroRouterStore {
   registerControls: (controls: MicroControl[]) => void;
   getControlAttrs: (name: string) => Record<string, unknown> | undefined;
   updateControlAttrs: (name: string, attrs: Record<string, unknown>) => void;
+
+  // ── History (only present when config.history.enabled) ────────────────────
+  /** Whether there's a previous entry to go back to */
+  canGoBack?: ComputedRef<boolean>;
+  /** Whether there's a forward entry (after going back) */
+  canGoForward?: ComputedRef<boolean>;
+  /** Navigate to previous history entry */
+  historyBack?: () => Promise<void>;
+  /** Navigate to next history entry */
+  historyForward?: () => Promise<void>;
+  /** Navigate by delta in history */
+  historyGo?: (delta: number) => Promise<void>;
+
+  // ── Serialization ────────────────────────────────────────────────────────
+  /** Serialize current router state to a JSON-safe object */
+  serialize?: () => SerializedState;
+  /** Restore router state from a serialized snapshot */
+  restore?: (state: SerializedState) => Promise<void>;
 
   // Audio (only present when audio sub-path is used)
   playSound?: (soundSrc: string, loop?: boolean) => Promise<void>;
