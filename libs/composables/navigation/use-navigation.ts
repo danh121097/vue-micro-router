@@ -256,8 +256,19 @@ export function useNavigation(
         segments.every((seg, i) => currentSegments[i] === seg);
 
       if (isBackNav) {
-        // Use navigateBack for clean slide-out animation
-        navigateBack(currentSegments.length - segments.length, props);
+        const stepsBack = currentSegments.length - segments.length;
+        if (stepsBack === 1) {
+          navigateBack(1, props);
+        } else {
+          // Multi-step: collapse intermediates instantly, animate only the last step
+          const intermediateSegments = currentSegments.slice(0, segments.length + 1);
+          const intermediatePath = buildPathFromSegments(intermediateSegments);
+          currentSegments.slice(segments.length + 1).forEach((seg) => {
+            state.routeAttrs.delete(seg);
+          });
+          state.activePath = intermediatePath;
+          navigateBack(1, props);
+        }
         return;
       }
 
@@ -279,9 +290,21 @@ export function useNavigation(
     const existingIndex = currentSegments.indexOf(dest);
     if (existingIndex !== -1) {
       const stepsBack = currentSegments.length - (existingIndex + 1);
-      if (stepsBack > 0) {
-        // Popping to an earlier segment — use navigateBack for clean slide-out
-        navigateBack(stepsBack, props);
+      if (stepsBack === 1) {
+        // Single step back — clean slide-out
+        navigateBack(1, props);
+      } else if (stepsBack > 1) {
+        // Multi-step back — instantly collapse to 1-step-from-target, then animate final step
+        // This prevents multiple pages animating out simultaneously
+        const intermediateSegments = currentSegments.slice(0, existingIndex + 2);
+        const intermediatePath = buildPathFromSegments(intermediateSegments);
+        // Clear attrs on pages we're skipping over (not the one that will animate out)
+        currentSegments.slice(existingIndex + 2).forEach((seg) => {
+          state.routeAttrs.delete(seg);
+        });
+        state.activePath = intermediatePath;
+        // Now animate the final step back
+        navigateBack(1, props);
       } else {
         // Re-navigating to current top segment — force remount
         state.routeKeys.set(dest, (state.routeKeys.get(dest) || 0) + 1);
