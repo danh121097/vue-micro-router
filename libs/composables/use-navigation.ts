@@ -1,14 +1,17 @@
 /**
- * Segment-based page navigation with forward/back, step-wise transitions, and route registration.
+ * Segment-based page navigation with forward/back transitions and route resolution.
  *
  * Path is a slash-separated segment string: "home/menu/settings" means 3 stacked pages.
  * activePage is the last segment (top of the stack).
  *
  * routeAttrs stored separately so attrs-only changes do NOT invalidate resolveRoutes computed.
+ *
+ * Step-wise navigation and route registration are extracted into:
+ *   - use-navigation-step-wise.ts  (stepWisePush, stepWiseBack)
+ *   - use-route-registry.ts        (registerRoute, registerRoutes, asyncLoaders)
  */
 import {
   computed,
-  defineAsyncComponent,
   reactive,
   shallowReactive,
   type AsyncComponentLoader,
@@ -20,17 +23,19 @@ import type { MicroRoute, PageTrackerHooks } from '../core/types';
 import {
   buildPathFromSegments,
   getLastSegment,
-  isAsyncLoader,
   normalizePath,
   parsePathSegments,
-  safeMarkRaw,
   warmLoaderCache
 } from '../utils/path-utils';
-import { createTimerManager, delay } from '../utils/timer-manager';
+import { createTimerManager } from '../utils/timer-manager';
+import { executeAfterHooks, executeGuardPipeline, type GuardConfig } from './use-navigation-guards';
+import { createRouteRegistry } from './use-route-registry';
+import { createStepWiseNavigation } from './use-navigation-step-wise';
 
 interface NavigationConfig {
   defaultPath: string;
   stepDelay?: number;
+  guards?: GuardConfig;
 }
 
 export interface NavigationState {
@@ -63,8 +68,9 @@ export function useNavigation(
 ): NavigationState {
   const defaultPath = config.defaultPath;
   const stepDelay = config.stepDelay ?? STEP_DELAY;
-  const asyncLoaders = new Map<string, AsyncComponentLoader>();
+  const guardConfig = config.guards ?? {};
   const timers = createTimerManager();
+  const registry = createRouteRegistry();
 
   let isNavigating = false;
 
@@ -72,8 +78,6 @@ export function useNavigation(
     activePath: defaultPath,
     fromPath: defaultPath,
     toPath: defaultPath,
-    /** Route definitions keyed by segment name */
-    routes: shallowReactive(new Map<string, MicroRoute>()),
     /** Attrs stored separately — changes here do NOT invalidate resolveRoutes computed */
     routeAttrs: shallowReactive(new Map<string, Record<string, unknown>>()),
     /** Version stamp per segment — incremented on re-navigation to same segment (forces transition) */
@@ -82,19 +86,43 @@ export function useNavigation(
     componentKeys: shallowReactive(new Map<string, number>())
   });
 
-  const resolveRoutes = computed<MicroRoute[]>(() => {
-    return parsePathSegments(state.activePath)
-      .map((segment): MicroRoute | undefined => {
-        const route = state.routes.get(segment);
-        if (!route) return undefined;
-        const version = state.routeKeys.get(segment) || 0;
-        const componentKey = state.componentKeys.get(segment) || 0;
-        return { ...route, key: `${route.path}-${version}`, componentKey };
-      })
-      .filter((r): r is MicroRoute => r !== undefined);
-  });
+  /**
+   * Cache for resolved route objects — avoids creating new object references
+   * when only attrs change (attrs are stored separately and not in resolveRoutes).
+   * Only replaces cached entry when key or componentKey actually changes.
+   */
+  const resolvedCache = new Map<string, MicroRoute>();
 
-  const safeTimeout = timers.schedule;
+  const resolveRoutes = computed<MicroRoute[]>(() => {
+    const activeSegments = parsePathSegments(state.activePath);
+    const result: MicroRoute[] = [];
+
+    for (const segment of activeSegments) {
+      const route = registry.routes.get(segment);
+      if (!route) continue;
+      const version = state.routeKeys.get(segment) || 0;
+      const componentKey = state.componentKeys.get(segment) || 0;
+      const key = `${route.path}-${version}`;
+
+      const cached = resolvedCache.get(segment);
+      if (cached && cached.key === key && cached.componentKey === componentKey) {
+        result.push(cached);
+      } else {
+        const resolved = { ...route, key, componentKey };
+        resolvedCache.set(segment, resolved);
+        result.push(resolved);
+      }
+    }
+
+    // Clean stale cache entries for segments no longer in the active path
+    for (const cachedSegment of resolvedCache.keys()) {
+      if (!activeSegments.includes(cachedSegment)) {
+        resolvedCache.delete(cachedSegment);
+      }
+    }
+
+    return result;
+  });
 
   // ── Internal navigation ───────────────────────────────────────────────────
 
@@ -141,7 +169,7 @@ export function useNavigation(
     const targetSegments = parsePathSegments(normalized);
     await Promise.all(
       targetSegments
-        .map((segment) => asyncLoaders.get(segment))
+        .map((segment) => registry.asyncLoaders.get(segment))
         .filter((loader): loader is AsyncComponentLoader => !!loader)
         .map((loader) => warmLoaderCache(loader))
     );
@@ -222,7 +250,31 @@ export function useNavigation(
     await navigateToPath(newPath, props);
   }
 
-  /** Public push — guarded against spam clicks */
+  /**
+   * Resolve the target path that a destination would produce, WITHOUT mutating state.
+   * Used to evaluate guards before committing navigation.
+   */
+  function resolveDestinationPath(destination: string | number): string {
+    if (typeof destination === 'number' && destination < 0) {
+      const segments = parsePathSegments(state.activePath);
+      const safeSteps = Math.min(Math.abs(destination), segments.length - 1);
+      return safeSteps <= 0
+        ? state.activePath
+        : buildPathFromSegments(segments.slice(0, -safeSteps));
+    }
+    const dest = destination.toString();
+    if (dest.startsWith('/')) return normalizePath(dest);
+    const currentSegments = parsePathSegments(state.activePath);
+    const existingIndex = currentSegments.indexOf(dest);
+    if (existingIndex !== -1) {
+      return buildPathFromSegments(currentSegments.slice(0, existingIndex + 1));
+    }
+    return buildPathFromSegments([...currentSegments, dest]);
+  }
+
+  const guardContext = { getRoute: (segment: string) => registry.routes.get(segment) };
+
+  /** Public push — runs navigation guards, then executes pushCore */
   async function push(
     destination: string | number,
     props?: Record<string, unknown>
@@ -230,55 +282,28 @@ export function useNavigation(
     if (isNavigating) return;
     isNavigating = true;
     try {
-      await pushCore(destination, props);
-      safeTimeout(() => {
-        isNavigating = false;
-      }, stepDelay);
-    } catch (e) {
-      isNavigating = false;
-      throw e;
-    }
-  }
-
-  async function stepWisePush(
-    targetPath: string,
-    props?: Record<string, unknown>
-  ) {
-    if (!targetPath || isNavigating) return;
-
-    const normalized = normalizePath(targetPath);
-    if (state.activePath === normalized) return;
-
-    isNavigating = true;
-    try {
-      const currentSegments = parsePathSegments(state.activePath);
-      const targetSegments = parsePathSegments(normalized);
-
-      if (targetPath.startsWith('/')) {
-        for (let i = 0; i < targetSegments.length; i++) {
-          const intermediate = buildPathFromSegments(
-            targetSegments.slice(0, i + 1)
-          );
-          if (state.activePath === intermediate) continue;
-          const isLast = i === targetSegments.length - 1;
-          await pushCore(intermediate, isLast ? props : undefined);
-          if (!isLast) await delay(stepDelay);
-        }
-      } else {
-        const toAdd = targetSegments.filter(
-          (s) => !currentSegments.includes(s)
-        );
-        if (toAdd.length === 0) {
-          await pushCore(targetPath, props);
+      // Run guard pipeline before any state mutation
+      const hasGlobalGuards = (guardConfig.beforeEach?.length ?? 0) > 0;
+      // Per-route guards are checked inside executeGuardPipeline — only enter pipeline if there's reason to
+      const hasPerRouteGuards = registry.routes.size > 0;
+      if ((hasGlobalGuards || hasPerRouteGuards) && destination) {
+        const targetPath = resolveDestinationPath(destination);
+        const fromPath = normalizePath(state.activePath);
+        const allowed = await executeGuardPipeline(targetPath, fromPath, guardConfig, guardContext);
+        if (!allowed) {
+          isNavigating = false;
           return;
         }
-        for (let i = 0; i < toAdd.length; i++) {
-          const isLast = i === toAdd.length - 1;
-          await pushCore(toAdd[i]!, isLast ? props : undefined);
-          if (!isLast) await delay(stepDelay);
-        }
       }
-      safeTimeout(() => {
+
+      const fromPath = normalizePath(state.activePath);
+      await pushCore(destination, props);
+      const toPath = normalizePath(state.activePath);
+
+      // Fire afterEach hooks (non-blocking)
+      executeAfterHooks(toPath, fromPath, guardConfig.afterEach);
+
+      timers.schedule(() => {
         isNavigating = false;
       }, stepDelay);
     } catch (e) {
@@ -287,50 +312,18 @@ export function useNavigation(
     }
   }
 
-  async function stepWiseBack(steps: number) {
-    if (steps < 1 || isNavigating) return;
-    const stepsBack = Math.abs(steps) - 1;
-    const currentSegments = parsePathSegments(state.activePath);
-    if (stepsBack >= currentSegments.length) return;
+  // ── Step-wise navigation (delegated) ──────────────────────────────────────
 
-    isNavigating = true;
-    try {
-      for (let i = 0; i < stepsBack; i++) {
-        await pushCore(-1);
-        if (i < stepsBack - 1) await delay(stepDelay);
-      }
-      safeTimeout(() => {
-        isNavigating = false;
-      }, stepDelay);
-    } catch (e) {
-      isNavigating = false;
-      throw e;
-    }
-  }
-
-  // ── Registration ──────────────────────────────────────────────────────────
-
-  function registerRoute(route: MicroRoute) {
-    if (state.routes.has(route.path)) {
-      console.warn(`[vue-micro-router] Route "${route.path}" already registered. Overwriting.`);
-    }
-
-    let { component } = route;
-
-    if (isAsyncLoader(component)) {
-      asyncLoaders.set(route.path, component);
-      component = defineAsyncComponent(component);
-    }
-
-    state.routes.set(route.path, {
-      ...route,
-      component: safeMarkRaw(component)
-    });
-  }
-
-  function registerRoutes(routes: MicroRoute[]) {
-    routes.forEach(registerRoute);
-  }
+  const stepWise = createStepWiseNavigation({
+    getActivePath: () => state.activePath,
+    pushCore,
+    runGuards: (to, from) => executeGuardPipeline(to, from, guardConfig, guardContext),
+    scheduleUnlock: () => timers.schedule(() => { isNavigating = false; }, stepDelay),
+    lock: () => { isNavigating = true; },
+    unlock: () => { isNavigating = false; },
+    isLocked: () => isNavigating,
+    stepDelay
+  });
 
   return {
     activePath: computed(() => state.activePath),
@@ -341,10 +334,10 @@ export function useNavigation(
     toPage: computed(() => getLastSegment(state.toPath)),
     resolveRoutes,
     push,
-    stepWisePush,
-    stepWiseBack,
-    registerRoute,
-    registerRoutes,
+    stepWisePush: stepWise.stepWisePush,
+    stepWiseBack: stepWise.stepWiseBack,
+    registerRoute: registry.registerRoute,
+    registerRoutes: registry.registerRoutes,
     updateRouteAttrs,
     getRouteAttrs,
     cleanup: timers.cleanup

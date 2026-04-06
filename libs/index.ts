@@ -30,6 +30,8 @@ export type {
   MicroRoute,
   MicroRouterConfig,
   MicroRouterStore,
+  NavigationAfterHook,
+  NavigationGuard,
   PageTrackerHooks,
   TransitionType
 } from './core/types';
