@@ -9,9 +9,18 @@ import type { InjectionKey } from 'vue';
 
 import type { MicroRouterStore } from './types';
 
-/** Inject/provide key for the MicroRouterStore — used by useGlobalMicroRouter / useMicroRouter */
+/** Default inject/provide key for the MicroRouterStore — used by useGlobalMicroRouter / useMicroRouter */
 export const MICRO_ROUTER_KEY: InjectionKey<MicroRouterStore> =
   Symbol('micro-router');
+
+/** Factory to create unique injection keys for nested routers */
+export function createRouterKey(): InjectionKey<MicroRouterStore> {
+  return Symbol('micro-router-nested');
+}
+
+/** Inject/provide key for the ROOT router — always points to the outermost MicroRouterView */
+export const MICRO_ROUTER_ROOT_KEY: InjectionKey<MicroRouterStore> =
+  Symbol('micro-router-root');
 
 /** Inject/provide key for the current route path — injected per RoutePage slot for useRouteLifecycle */
 export const MICRO_ROUTE_PATH_KEY: InjectionKey<string> =
