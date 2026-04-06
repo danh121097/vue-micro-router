@@ -45,10 +45,14 @@
   "sideEffects": ["*.css"],
   "peerDependencies": {
     "vue": "^3.4.0",
-    "howler": "^2.2.0"
+    "howler": "^2.2.0",
+    "@vue/devtools-api": "^6.0.0 || ^7.0.0"
   },
   "peerDependenciesMeta": {
     "howler": {
+      "optional": true
+    },
+    "@vue/devtools-api": {
       "optional": true
     }
   },
