@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Package tarballs
+*.tgz
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Repomix
+repomix-output.xml
+
+# Claude Code
+.claude/
+
+# Internal docs & plans
+plans/
+docs/

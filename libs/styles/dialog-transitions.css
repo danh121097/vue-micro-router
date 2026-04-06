@@ -1,0 +1,163 @@
+/* ── Dialog Base ──────────────────────────────────── */
+.micro-dialog {
+  border: none;
+  padding: 0;
+  max-width: 100vw;
+  max-height: 100dvh;
+  background: transparent;
+  overflow: visible;
+  will-change: opacity, transform;
+}
+
+.micro-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+  animation: _dialog-fade-in 0.3s ease-out forwards;
+}
+
+.micro-dialog--closing::backdrop {
+  animation: _dialog-fade-out 0.2s ease-in forwards;
+}
+
+.micro-dialog__content {
+  position: relative;
+}
+
+/* ── Positions ───────────────────────────────────── */
+.micro-dialog--standard {
+  margin: auto;
+}
+
+.micro-dialog--top {
+  margin: 0 auto auto auto;
+}
+
+.micro-dialog--bottom {
+  margin: auto auto 0 auto;
+}
+
+.micro-dialog--left {
+  margin: auto auto auto 0;
+}
+
+.micro-dialog--right {
+  margin: auto 0 auto auto;
+}
+
+/* ── Fullscreen ──────────────────────────────────── */
+.micro-dialog--fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  max-width: 100vw;
+  max-height: 100dvh;
+  margin: 0;
+  border-radius: 0;
+}
+
+/* ── Seamless (no background/shadow) ─────────────── */
+.micro-dialog--seamless {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* ── Keyframes ───────────────────────────────────── */
+@keyframes _dialog-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes _dialog-scale-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
+@keyframes _dialog-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes _dialog-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes _dialog-scale-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes _dialog-scale-pop-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+
+@keyframes _dialog-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes _dialog-slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ── Fade (scale+fade) ───────────────────────────── */
+.dialog-transition-fade:not(.micro-dialog--closing) {
+  animation: _dialog-scale-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.dialog-transition-fade.micro-dialog--closing {
+  animation: _dialog-scale-out 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+}
+
+/* ── Scale (pop scale+fade) ──────────────────────── */
+.dialog-transition-scale:not(.micro-dialog--closing) {
+  animation: _dialog-scale-pop-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.dialog-transition-scale.micro-dialog--closing {
+  animation: _dialog-scale-pop-out 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ── Slide (matches page router) ─────────────────── */
+.dialog-transition-slide:not(.micro-dialog--closing) {
+  animation: _dialog-slide-in var(--dialog-duration, 0.5s)
+    cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}
+.dialog-transition-slide.micro-dialog--closing {
+  animation: _dialog-slide-out var(--dialog-duration, 0.5s)
+    cubic-bezier(0.65, 0, 0.35, 1) forwards;
+}

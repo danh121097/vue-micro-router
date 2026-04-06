@@ -1,0 +1,86 @@
+/* ── Route Page ──────────────────────────────────── */
+.route-page {
+  position: absolute !important;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  transform: translateX(0);
+}
+
+.route-page__body {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.route-page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.3s cubic-bezier(0.65, 0, 0.35, 1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.route-page.deactive {
+  transform: translateX(-20%);
+}
+
+.route-page.deactive::before {
+  opacity: 1;
+}
+
+/* ── Page Slide ──────────────────────────────────── */
+.page-slide-enter-active,
+.page-slide-leave-active {
+  transition: transform 0.5s cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+.page-slide-enter-from,
+.page-slide-leave-to {
+  transform: translateX(100%);
+}
+
+/* ── Content Layer ───────────────────────────────── */
+.micro-router-content-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* ── GUI Layer ───────────────────────────────────── */
+.micro-router-gui-layer {
+  position: fixed;
+  width: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  overflow: visible;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.micro-router-gui-layer.gui-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Control Fade ────────────────────────────────── */
+.control-fade-move,
+.control-fade-enter-active,
+.control-fade-leave-active {
+  transition: opacity 0.5s ease;
+}
+
+.control-fade-enter-from,
+.control-fade-leave-to {
+  opacity: 0;
+}
+
+.control-fade-leave-active {
+  position: absolute;
+}

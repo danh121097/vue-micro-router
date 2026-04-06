@@ -1,0 +1,10 @@
+libs/
+tests/
+examples/
+plans/
+docs/
+tsconfig.json
+vite.config.ts
+bunfig.toml
+.gitignore
+.DS_Store
