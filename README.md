@@ -9,11 +9,17 @@ Build apps that feel like native mobile — pages slide in/out with smooth trans
 | | vue-router | vue-micro-router |
 |---|---|---|
 | Navigation model | URL-based (`/path/:param`) | Segment stack (`home → home/menu → home/menu/settings`) |
-| Page transitions | Manual (TransitionGroup) | Built-in slide/fade animations |
+| Page transitions | Manual (TransitionGroup) | Built-in slide/fade animations + per-route customization |
 | Multiple visible pages | No (one route = one view) | Yes — stacked pages all render simultaneously |
 | Modal dialogs | DIY | First-class with stacking, backdrop, focus trap |
 | GUI overlays / HUD | DIY | First-class controls with auto-show/hide |
+| Route guards | `beforeRouteEnter` etc. | `beforeEach`, `beforeEnter`, `beforeLeave` + async |
 | State passing | Query params / route params | Reactive `useMicroState()` bridge |
+| Navigation history | Browser history API | Built-in `canGoBack` / `historyBack()` |
+| Gesture navigation | None | Swipe-back from left edge |
+| Type safety | Route params typing | Full `useMicroRouter<AppRoutes>()` |
+| State persistence | None | `serialize()` / `restore()` |
+| Nested routers | Nested `<router-view>` | Independent `<MicroRouterView nested>` |
 | Lifecycle hooks | `beforeRouteEnter` etc. | `onRouteEnter`, `onDialogEnter`, `onControlEnter` |
 | Use case | Websites, SPAs | Games, mobile-style apps, kiosks, wizards |
 
@@ -55,8 +61,9 @@ const plugin = defineFeaturePlugin({
   name: 'app',
   routes: [
     { path: 'home', component: HomePage },
-    { path: 'menu', component: MenuPage },
-    { path: 'settings', component: SettingsPage },
+    { path: 'menu', component: MenuPage, transition: 'fade', transitionDuration: 300 },
+    { path: 'settings', component: SettingsPage, preload: 'adjacent',
+      beforeLeave: () => confirm('Leave settings?') },
   ],
   dialogs: [
     { path: 'confirm', component: ConfirmDialog, activated: false },
@@ -69,7 +76,18 @@ const plugin = defineFeaturePlugin({
 
 <template>
   <MicroRouterView
-    :config="{ defaultPath: 'home', defaultControlName: 'main_gui' }"
+    :config="{
+      defaultPath: 'home',
+      defaultControlName: 'main_gui',
+      history: { enabled: true, maxEntries: 50 },
+      gesture: { enabled: true },
+      guards: {
+        beforeEach: [(to, from) => {
+          console.log(`Navigating: ${from} → ${to}`);
+          return true;
+        }],
+      },
+    }"
     :plugins="[plugin]"
   />
 </template>
@@ -119,6 +137,193 @@ const { tab } = useMicroState({ tab: 'overview' });
 </script>
 ```
 
+### Route Guards
+
+Prevent or control navigation with sync/async guards:
+
+```ts
+// Global guards — run on every navigation
+const config = {
+  guards: {
+    beforeEach: [
+      async (to, from) => {
+        if (to.includes('admin') && !isAuthenticated()) return false;
+        return true;
+      }
+    ],
+    afterEach: [(to, from) => analytics.track('navigate', { to, from })],
+  }
+};
+
+// Per-route guards — on specific routes
+defineFeaturePlugin({
+  routes: [
+    {
+      path: 'admin',
+      component: AdminPage,
+      beforeEnter: async (to, from) => {
+        const user = await fetchUser();
+        return user.isAdmin;
+      },
+    },
+    {
+      path: 'editor',
+      component: EditorPage,
+      beforeLeave: (to, from) => {
+        if (hasUnsavedChanges()) return confirm('Discard changes?');
+        return true;
+      },
+    },
+  ],
+});
+```
+
+Guard execution order: `global beforeEach → target beforeEnter → source beforeLeave → global afterEach`
+
+Guards have a 5s timeout — if a guard doesn't resolve, navigation is cancelled.
+
+### Per-Route Transitions
+
+Each route can have its own transition style and duration:
+
+```ts
+defineFeaturePlugin({
+  routes: [
+    { path: 'home', component: HomePage },                           // default: slide 500ms
+    { path: 'settings', component: SettingsPage, transition: 'fade', transitionDuration: 300 },
+    { path: 'modal-page', component: ModalPage, transition: 'none' }, // instant, no animation
+  ],
+});
+```
+
+Supported: `'slide'` (default), `'fade'`, `'none'`
+
+### Navigation History
+
+Opt-in browser-like history with back/forward:
+
+```ts
+const config = {
+  history: { enabled: true, maxEntries: 50 },
+};
+
+// In any component:
+const router = useMicroRouter();
+router.canGoBack?.value;    // reactive boolean
+router.canGoForward?.value; // reactive boolean
+await router.historyBack?.();
+await router.historyForward?.();
+await router.historyGo?.(-2); // go back 2 entries
+```
+
+History truncates forward entries on new push (browser behavior).
+
+### Type-Safe Routes
+
+Opt-in TypeScript safety for route names and props:
+
+```ts
+// Define your route map
+interface AppRoutes {
+  home: undefined;
+  profile: { userId: number };
+  settings: { tab?: string };
+}
+
+// Typed router — push validates route names and props
+const router = useMicroRouter<AppRoutes>();
+router.push('profile', { userId: 42 }); // OK
+router.push('profile');                  // TS Error: missing props
+router.push('typo');                     // TS Error: not in AppRoutes
+```
+
+Untyped usage (`useMicroRouter()` without generic) still works.
+
+### State Serialization
+
+Save and restore full router state for session persistence:
+
+```ts
+const router = useMicroRouter();
+
+// Save state (e.g., on page hide)
+const snapshot = router.serialize!();
+localStorage.setItem('router-state', JSON.stringify(snapshot));
+
+// Restore state (e.g., on page load)
+const saved = localStorage.getItem('router-state');
+if (saved) await router.restore!(JSON.parse(saved));
+```
+
+Serializes: navigation path + attrs, dialog stack + attrs, control state + attrs.
+
+### Route Preloading
+
+Preload async route components before they're needed:
+
+```ts
+defineFeaturePlugin({
+  routes: [
+    { path: 'home', component: () => import('./Home.vue') },
+    { path: 'shop', component: () => import('./Shop.vue'), preload: 'eager' },     // loads on mount
+    { path: 'cart', component: () => import('./Cart.vue'), preload: 'adjacent' },   // loads after each nav
+  ],
+});
+
+// Manual preload
+await router.preloadRoute('cart');
+```
+
+### Gesture Navigation (Swipe Back)
+
+iOS-style swipe-back from the left edge:
+
+```ts
+const config = {
+  gesture: {
+    enabled: true,
+    edgeWidth: 20,       // px from left edge (default: 20)
+    threshold: 0.3,      // 30% screen width to trigger (default: 0.3)
+    velocityThreshold: 0.5, // px/ms fast swipe (default: 0.5)
+  },
+};
+```
+
+### Nested Routers
+
+Independent router instances within the same component tree:
+
+```vue
+<template>
+  <!-- Root router -->
+  <MicroRouterView :config="rootConfig" :plugins="[mainPlugin]">
+    <!-- Inside a page component: -->
+    <MicroRouterView nested :config="tabConfig" :plugins="[tabPlugin]" />
+  </MicroRouterView>
+</template>
+```
+
+```ts
+// Access root router from within nested router
+const rootRouter = useMicroRouter({ root: true });
+const localRouter = useMicroRouter(); // nearest parent
+```
+
+### Shared Element Transitions
+
+Opt-in View Transition API (Chrome 111+) for shared element morphing:
+
+```ts
+defineFeaturePlugin({
+  routes: [
+    { path: 'list', component: ListPage },
+    { path: 'detail', component: DetailPage, viewTransition: true },
+  ],
+});
+```
+
+Users set `view-transition-name` on their own elements via CSS. Graceful fallback in unsupported browsers.
+
 ### Step-Wise Navigation
 
 Animate through intermediate pages one-by-one:
@@ -153,31 +358,6 @@ closeDialog('confirm');
 closeAllDialogs();
 ```
 
-```vue
-<!-- ConfirmDialog.vue -->
-<script setup>
-import { useMicroState } from 'vue-micro-router';
-
-const { title, onConfirm } = useMicroState<{
-  title: string;
-  onConfirm: () => void;
-}>();
-
-// onClose is auto-injected via dialog.attrs (optional — set via nextTick)
-const props = withDefaults(defineProps<{ onClose?: () => void }>(), {
-  onClose: () => {},
-});
-</script>
-
-<template>
-  <div class="dialog-content">
-    <h2>{{ title }}</h2>
-    <button @click="onConfirm(); props.onClose()">Yes</button>
-    <button @click="props.onClose()">Cancel</button>
-  </div>
-</template>
-```
-
 Dialog options:
 
 ```ts
@@ -187,10 +367,10 @@ registerDialog({
   activated: false,
   position: 'right',          // 'standard' | 'top' | 'right' | 'bottom' | 'left'
   transition: 'slide',        // 'fade' | 'slide' | 'scale'
-  transitionDuration: 400,    // ms (default: slide=500, fade/scale=300)
+  transitionDuration: 400,
   fullscreen: false,
   persistent: true,           // prevent close on backdrop click / Escape
-  seamless: true,             // transparent background, no shadow (default)
+  seamless: true,             // transparent background, no shadow
 });
 ```
 
@@ -208,20 +388,11 @@ toggleControl('inventory', true, { filter: 'weapons' });
 toggleControl('inventory', false);
 ```
 
-```vue
-<!-- InventoryHUD.vue -->
-<script setup>
-import { useMicroState } from 'vue-micro-router';
-const { filter } = useMicroState({ filter: 'all' });
-</script>
-```
-
 ### Lifecycle Hooks
 
 iOS-style `viewWillAppear` / `viewWillDisappear` — available for routes, dialogs, and controls:
 
 ```vue
-<!-- Inside a route page component -->
 <script setup>
 import { useRouteLifecycle } from 'vue-micro-router';
 
@@ -232,43 +403,20 @@ useRouteLifecycle({
 </script>
 ```
 
-```vue
-<!-- Inside a dialog component -->
-<script setup>
-import { useDialogLifecycle } from 'vue-micro-router';
-
-useDialogLifecycle({
-  onDialogEnter: () => console.log('Dialog is now the topmost dialog'),
-  onDialogLeave: () => console.log('Dialog is no longer the topmost dialog'),
-});
-</script>
-```
-
-```vue
-<!-- Inside a control component -->
-<script setup>
-import { useControlLifecycle } from 'vue-micro-router';
-
-useControlLifecycle({
-  onControlEnter: () => console.log('Control is now active'),
-  onControlLeave: () => console.log('Control deactivated'),
-});
-</script>
-```
+Also: `useDialogLifecycle({ onDialogEnter, onDialogLeave })` and `useControlLifecycle({ onControlEnter, onControlLeave })`.
 
 ### Feature Plugins
 
 Bundle routes, dialogs, and controls into feature modules:
 
 ```ts
-// features/shop.ts
 import { defineFeaturePlugin } from 'vue-micro-router';
 
 export const shopPlugin = defineFeaturePlugin({
   name: 'shop',
   routes: [
-    { path: 'shop', component: () => import('./ShopPage.vue') },
-    { path: 'cart', component: () => import('./CartPage.vue') },
+    { path: 'shop', component: () => import('./ShopPage.vue'), preload: 'eager' },
+    { path: 'cart', component: () => import('./CartPage.vue'), preload: 'adjacent' },
   ],
   dialogs: [
     { path: 'buy-confirm', component: () => import('./BuyConfirm.vue'), activated: false },
@@ -277,13 +425,6 @@ export const shopPlugin = defineFeaturePlugin({
     { name: 'shop_hud', component: () => import('./ShopHUD.vue'), activated: false },
   ],
 });
-```
-
-```vue
-<!-- App.vue -->
-<template>
-  <MicroRouterView :plugins="[shopPlugin, inventoryPlugin]" />
-</template>
 ```
 
 ### Analytics / Page Tracking
@@ -303,40 +444,51 @@ const config: MicroRouterConfig = {
 };
 ```
 
+### Vue Devtools
+
+Automatic in development — shows a "Micro Router" inspector tab with:
+- Current path and page stack
+- Open dialogs with attrs
+- Active controls
+- Navigation timeline events
+
+Requires `@vue/devtools-api` (optional peer dependency). Zero cost in production builds.
+
 ## Optional: Audio Manager
 
-Background music tied to route BGM fields. Requires `howler`:
+Background music tied to route BGM fields. Supports custom audio backends via `AudioAdapter`:
 
 ```bash
 bun add howler
 ```
 
 ```ts
-import { useAudioManager } from 'vue-micro-router/audio';
-import { ref } from 'vue';
+import { useAudioManager, HowlerAdapter } from 'vue-micro-router/audio';
 
-const volume = ref(80); // 0-100
 const audio = useAudioManager({
-  volumeRef: volume,
+  volumeRef: ref(80),
   urlResolver: (name) => `/assets/audio/${name}.mp3`,
+  // adapter: new HowlerAdapter(), // default — or provide your own AudioAdapter
 });
-
-// Play a sound
-await audio.playSound('click');
-
-// Play looping BGM
-await audio.playSound('battle-theme', true);
-
-// Auto-pause on tab hidden, resume on tab visible
-addEventListener('visibilitychange', audio.handleVisibilityChange);
 ```
 
-Set `bgm` on routes for automatic music switching:
+Custom adapter:
 
 ```ts
-registerRoute({ path: 'battle', component: BattlePage, bgm: 'battle-theme' });
-registerRoute({ path: 'town', component: TownPage, bgm: 'peaceful' });
-// Music auto-switches when navigating between routes
+import type { AudioAdapter } from 'vue-micro-router/audio';
+
+class WebAudioAdapter implements AudioAdapter {
+  async play(src, options) { /* Web Audio API */ }
+  stop() { /* ... */ }
+  pause() { /* ... */ }
+  resume() { /* ... */ }
+  fade(from, to, duration) { /* ... */ }
+  isPlaying() { return false; }
+  state() { return 'unloaded'; }
+  cleanup() { /* ... */ }
+}
+
+const audio = useAudioManager({ adapter: new WebAudioAdapter() });
 ```
 
 ## Styles
@@ -347,18 +499,7 @@ Import styles separately (not bundled with JS):
 import 'vue-micro-router/styles';
 ```
 
-Includes:
-- Page slide transitions (`.page-slide-*`)
-- Dialog animations (fade, scale, slide) with `::backdrop`
-- Control fade transitions
-- GUI layer positioning
-
-Customize via CSS custom properties:
-
-```css
-/* Override dialog transition duration */
-.micro-dialog { --dialog-duration: 400ms; }
-```
+Includes page slide/fade transitions, dialog animations, control fade transitions, and GUI layer positioning.
 
 ## API Reference
 
@@ -367,21 +508,23 @@ Customize via CSS custom properties:
 | Composable | Description |
 |-----------|-------------|
 | `useGlobalMicroRouter(config?)` | Create & provide store. Call once in root. |
-| `useMicroRouter()` | Inject store from parent `<MicroRouterView>`. |
+| `useMicroRouter(options?)` | Inject store. Pass `{ root: true }` for root in nested setups. |
+| `useMicroRouter<T>()` | Typed version — validates route names and props at compile time. |
 | `useMicroState<T>(defaults?)` | Reactive attrs bridge — read/write props in routes, dialogs, controls. |
-| `useRouteLifecycle(hooks)` | `onRouteEnter` / `onRouteLeave` — fires when a page becomes/stops being the top page. |
-| `useDialogLifecycle(hooks)` | `onDialogEnter` / `onDialogLeave` — fires when a dialog becomes/stops being the topmost dialog. |
-| `useControlLifecycle(hooks)` | `onControlEnter` / `onControlLeave` — fires when a control activates/deactivates. |
+| `useRouteLifecycle(hooks)` | `onRouteEnter` / `onRouteLeave` — fires when page becomes/stops being top. |
+| `useDialogLifecycle(hooks)` | `onDialogEnter` / `onDialogLeave` — fires when dialog becomes/stops being topmost. |
+| `useControlLifecycle(hooks)` | `onControlEnter` / `onControlLeave` — fires when control activates/deactivates. |
 | `usePageTracker(hooks?)` | Normalize tracker hooks with no-op fallbacks. |
 | `useNavigation(config?, tracker?)` | Low-level page navigation (used internally). |
 | `useDialogManager(tracker?)` | Low-level dialog management (used internally). |
 | `useControlManager(config?, tracker?)` | Low-level control management (used internally). |
+| `useGestureNavigation(config, ctx)` | Swipe-back gesture handler (used internally by MicroRouterView). |
 
 ### Components
 
 | Component | Description |
 |-----------|-------------|
-| `<MicroRouterView>` | Root wrapper — renders pages, dialogs, controls. |
+| `<MicroRouterView>` | Root wrapper — renders pages, dialogs, controls. Accepts `nested` prop. |
 | `<RoutePage>` | Page slot wrapper — provides attrs injection. |
 | `<MicroDialogComponent>` | Headless native `<dialog>` — focus trap, backdrop, escape key. |
 | `<MicroControlWrapper>` | Control slot wrapper — provides attrs injection. |
@@ -393,19 +536,36 @@ Customize via CSS custom properties:
 | `defineFeaturePlugin(config)` | Create a feature plugin bundle. |
 | `registerFeaturePlugins(plugins, store)` | Register all plugins with the store. |
 
-## TypeScript
+### Types
 
-Full strict TypeScript support. All composables return typed interfaces.
+| Type | Description |
+|------|-------------|
+| `NavigationGuard` | `(to, from) => boolean \| Promise<boolean>` |
+| `NavigationAfterHook` | `(to, from) => void` |
+| `RouteMap` | `Record<string, Record<string, unknown> \| undefined>` |
+| `TypedPush<T>` | Type-safe push overloads for a RouteMap |
+| `SerializedState` | JSON-serializable router state snapshot |
+| `AudioAdapter` | Abstract audio playback interface |
+| `GestureConfig` | Gesture navigation configuration |
 
-```ts
-// Extend with your own route params
-const { userId } = useMicroState<{ userId: number }>();
-```
+## Performance
+
+| Metric | Value |
+|--------|-------|
+| Core bundle (gzip) | 10.35 kB |
+| Audio (gzip) | 1.07 kB |
+| Styles (gzip) | 0.84 kB |
+| Navigation latency (p50) | < 0.01 ms |
+| Tests | 150 passing |
+| Coverage | ~96% |
+
+Run benchmarks: `bun run bench` (navigation timing) / `bun run bench:size` (bundle check)
 
 ## Peer Dependencies
 
 - `vue` >= 3.4.0
 - `howler` >= 2.2.0 *(optional — only for `vue-micro-router/audio`)*
+- `@vue/devtools-api` >= 6.0.0 *(optional — only for devtools inspector)*
 
 ## License
 

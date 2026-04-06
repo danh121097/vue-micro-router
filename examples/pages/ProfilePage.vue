@@ -1,10 +1,34 @@
 <script setup lang="ts">
 /**
- * Profile page — demonstrates reading props passed via push().
+ * ProfilePage — demonstrates:
+ *   Phase 2: TypeSafe route usage pattern with useMicroRouter<AppRoutes>()
+ *   Phase 2: preload:'adjacent' (set in App.vue route config)
+ *   Phase 3: viewTransition:true (set in App.vue route config)
+ *   Phase 1: beforeEnter guard (set in App.vue route config)
+ *   Core: props via push(), useMicroState
  */
 import { useMicroRouter, useMicroState, useRouteLifecycle } from '../../libs/index';
+import type { TypedMicroRouterStore } from '../../libs/index';
+import type { RouteMap } from '../../libs/index';
 
-const { push } = useMicroRouter();
+/**
+ * Phase 2: TypeSafe route map — define once, use everywhere.
+ * Pass as generic to useMicroRouter<AppRoutes>() to get typed push().
+ *
+ * router.push('profile', { userId: 42 })  // OK
+ * router.push('profile')                   // TS error: missing props
+ * router.push('typo')                      // TS error: not in AppRoutes
+ */
+interface AppRoutes extends RouteMap {
+  home: undefined;
+  settings: { tab?: string };
+  profile: { userId: number; username: string };
+  admin: undefined;
+  nested: undefined;
+}
+
+// Typed router — push() validates route names and props at compile time
+const router = useMicroRouter<AppRoutes>() as TypedMicroRouterStore<AppRoutes>;
 
 // Read props passed via push('profile', { userId: 42, username: 'Danh' })
 const { userId, username } = useMicroState({ userId: 0, username: 'Guest' });
@@ -19,6 +43,12 @@ useRouteLifecycle({
   <div class="page profile-page">
     <h1>Profile</h1>
 
+    <div class="badges">
+      <span class="badge blue">preload: adjacent</span>
+      <span class="badge purple">viewTransition: true</span>
+      <span class="badge green">beforeEnter guard</span>
+    </div>
+
     <div class="profile-card">
       <div class="avatar">{{ username.charAt(0).toUpperCase() }}</div>
       <div class="details">
@@ -28,14 +58,32 @@ useRouteLifecycle({
     </div>
 
     <div class="actions">
-      <button @click="push(-1)">← Back</button>
-      <button @click="push(-2)">← Back to Home</button>
+      <button @click="router.push(-1)">← Back</button>
+      <button @click="router.push('home')">Home</button>
     </div>
 
     <div class="info">
-      <h3>Props via push()</h3>
-      <p>This page received <code>{ userId: {{ userId }}, username: '{{ username }}' }</code></p>
-      <p>Read with <code>useMicroState({ userId: 0, username: 'Guest' })</code></p>
+      <h3>Phase 2: TypeSafe Routes</h3>
+      <p>Define a <code>RouteMap</code> interface, pass as generic:</p>
+      <pre class="code-block">interface AppRoutes extends RouteMap {
+  home: undefined;
+  profile: { userId: number; username: string };
+}
+
+// Typed push — validated at compile time
+const router = useMicroRouter&lt;AppRoutes&gt;();
+router.push('profile', { userId: 42, username: 'Danh' }); // OK
+router.push('profile'); // TS error: missing props
+router.push('typo');    // TS error: not in AppRoutes</pre>
+    </div>
+
+    <div class="info">
+      <h3>Phase 3: View Transition API</h3>
+      <p>
+        <code>viewTransition: true</code> on the route opts in to the browser's
+        View Transition API for shared element morphing. Falls back gracefully
+        on unsupported browsers (Firefox, Safari).
+      </p>
     </div>
   </div>
 </template>
@@ -46,12 +94,22 @@ useRouteLifecycle({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  gap: 1.5rem;
+  min-height: 100%;
+  gap: 1.25rem;
   padding: 2rem;
   background: #0a192f;
 }
 h1 { font-size: 2rem; }
+.badges { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center; }
+.badge {
+  padding: 0.2rem 0.6rem;
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  border: 1px solid;
+}
+.badge.blue   { border-color: #3b82f6; color: #93c5fd; background: #1e3a5f22; }
+.badge.purple { border-color: #8b5cf6; color: #c4b5fd; background: #2e106522; }
+.badge.green  { border-color: #10b981; color: #6ee7b7; background: #06503b22; }
 .profile-card {
   display: flex;
   align-items: center;
@@ -72,21 +130,38 @@ h1 { font-size: 2rem; }
   font-weight: bold;
 }
 .name { font-size: 1.2rem; font-weight: 600; }
-.id { color: #94a3b8; font-size: 0.85rem; }
+.id   { color: #94a3b8; font-size: 0.85rem; }
 .actions { display: flex; gap: 0.75rem; }
 button {
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   border: 1px solid #475569;
   border-radius: 0.5rem;
   background: #1e293b;
   color: #e2e8f0;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   transition: background 0.2s;
 }
 button:hover { background: #334155; }
-.info { margin-top: 1rem; padding: 1.5rem; background: #112240; border-radius: 0.75rem; max-width: 500px; }
-.info h3 { margin-bottom: 0.5rem; }
-.info p { font-size: 0.85rem; margin: 0.25rem 0; }
-code { color: #38bdf8; font-size: 0.8rem; }
+.info {
+  padding: 1.25rem 1.5rem;
+  background: #112240;
+  border-radius: 0.75rem;
+  max-width: 520px;
+  width: 100%;
+}
+.info h3 { margin-bottom: 0.5rem; font-size: 0.9rem; color: #94a3b8; }
+.info p  { font-size: 0.82rem; margin: 0.2rem 0; }
+code { color: #38bdf8; font-size: 0.78rem; }
+.code-block {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: #0f172a;
+  border-radius: 0.375rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  white-space: pre-wrap;
+  font-family: monospace;
+  border: 1px solid #1e293b;
+}
 </style>
