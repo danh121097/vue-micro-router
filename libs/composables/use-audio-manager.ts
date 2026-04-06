@@ -1,25 +1,24 @@
 /**
  * Manages background music playback tied to route BGM fields.
  *
- * Wraps Howler.js for audio. BGM is driven by the bgm field on registered MicroRoute objects.
- * Accepts a urlResolver config instead of hardcoded CDN util — user provides their own URL builder.
- *
+ * Accepts an optional AudioAdapter — defaults to HowlerAdapter (lazy-loaded).
+ * BGM is driven by the bgm field on registered MicroRoute objects.
  * Volume fade 0 → target over 200ms on every new sound prevents audible pop/click.
- * delay(50) before creating new Howl gives previous cleanSound() time to complete.
  */
 import { computed, ref, watch, type Ref } from 'vue';
 
+import type { AudioAdapter } from '../audio/audio-adapter-types';
+import { HowlerAdapter } from '../audio/howler-adapter';
 import type { MicroRoute } from '../core/types';
 import { delay } from '../utils/timer-manager';
-
-type HowlCtor = typeof import('howler').Howl;
-type HowlInstance = InstanceType<HowlCtor>;
 
 export interface AudioManagerConfig {
   /** Volume ref (0-100). Defaults to 100. */
   volumeRef?: Ref<number>;
   /** Resolve a sound name to a full URL. Defaults to identity (name returned as-is). */
   urlResolver?: (name: string) => string;
+  /** Custom audio adapter. Defaults to HowlerAdapter (requires howler peer dep). */
+  adapter?: AudioAdapter;
 }
 
 export interface AudioManagerState {
@@ -36,62 +35,32 @@ export interface AudioManagerState {
 export function useAudioManager(
   config?: AudioManagerConfig
 ): AudioManagerState {
-  let sound: HowlInstance | null = null;
-  let howlCtorPromise: Promise<HowlCtor> | null = null;
   let isVisibilityChange = false;
   let previousSoundSrc = 'default';
 
+  const adapter: AudioAdapter = config?.adapter ?? new HowlerAdapter();
   const soundSrc = ref<string>('default');
   const resolveUrl = config?.urlResolver ?? ((name: string) => name);
   const volume = computed(() => (config?.volumeRef?.value ?? 100) / 100);
 
-  function cleanSound() {
-    try {
-      if (sound) {
-        sound.stop();
-        sound.off();
-        sound.unload();
-        sound = null;
-      }
-    } catch {
-      sound = null;
-    }
-  }
-
-  /** Lazy-load Howler.js — only imported when first sound is played */
-  async function getHowlCtor() {
-    if (!howlCtorPromise) {
-      howlCtorPromise = import('howler').then((mod) => mod.Howl);
-    }
-    return howlCtorPromise;
-  }
-
   async function playSound(src: string, loop = false) {
     try {
-      if (sound?.playing() && soundSrc.value === src) return;
+      if (adapter.isPlaying() && soundSrc.value === src) return;
 
       previousSoundSrc = soundSrc.value;
       soundSrc.value = src;
-      cleanSound();
+      adapter.stop();
       await delay(50);
-      const Howl = await getHowlCtor();
 
-      sound = new Howl({
-        src: [resolveUrl(src)],
-        autoplay: true,
-        loop,
-        volume: 0
-      });
-      sound.play();
-      sound.fade(0, volume.value, 200);
+      await adapter.play(resolveUrl(src), { loop, volume: volume.value });
     } catch (error) {
       console.error('Sound playback failed:', error);
-      cleanSound();
+      adapter.stop();
     }
   }
 
   function stopSound() {
-    cleanSound();
+    adapter.stop();
   }
 
   async function updateBackgroundMusic(
@@ -117,27 +86,26 @@ export function useAudioManager(
     if (typeof document === 'undefined') return;
     try {
       if (document.hidden) {
-        if (sound?.playing()) {
-          sound.pause();
+        if (adapter.isPlaying()) {
+          adapter.pause();
           isVisibilityChange = true;
         }
-      } else if (sound && isVisibilityChange && sound.state() === 'loaded') {
-        sound.play();
+      } else if (isVisibilityChange && adapter.state() === 'loaded') {
+        adapter.resume();
         isVisibilityChange = false;
       }
     } catch {
-      cleanSound();
+      adapter.stop();
     }
   }
 
   function cleanup() {
-    cleanSound();
+    adapter.cleanup();
   }
 
-  watch(volume, (vol) => {
-    if (sound?.playing()) {
-      const current = sound.volume();
-      sound.fade(current, vol, 300);
+  watch(volume, (vol, oldVol) => {
+    if (adapter.isPlaying()) {
+      adapter.fade(oldVol ?? 0, vol, 300);
     }
   });
 
