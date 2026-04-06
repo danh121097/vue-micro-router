@@ -63,13 +63,15 @@ export function useControlManager(
     return result;
   });
 
-  const resolveControls = computed<MicroControl[]>(() => activeControls.value);
+  // Expose activeControls directly — no proxy computed needed
+  const resolveControls = activeControls;
   const activeControl = computed(() =>
     activeControls.value.some((c) => c.name !== defaultName)
   );
-  const currentControl = computed(() =>
-    activeControls.value[0]?.name ?? defaultName
-  );
+  const currentControl = computed(() => {
+    const nonDefault = activeControls.value.find((c) => c.name !== defaultName);
+    return nonDefault?.name ?? defaultName;
+  });
 
   function toggleControl(
     name: string,

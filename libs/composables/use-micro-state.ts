@@ -48,10 +48,11 @@ export function useMicroState<T extends object>(defaults?: T): ToRefs<T> {
   const state = reactive(initial) as T;
 
   // Auto-sync changes back (flush: 'post' batches updates after render)
+  // Watch state directly — spread in callback only, not in source (avoids defeating Vue dirty-check)
   if (writeAttrs) {
     watch(
-      () => ({ ...state }),
-      (newState) => writeAttrs(newState as Record<string, unknown>),
+      state,
+      (newState) => writeAttrs({ ...newState } as Record<string, unknown>),
       { deep: true, flush: 'post' }
     );
   }

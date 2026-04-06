@@ -18,7 +18,7 @@ import {
   watch
 } from 'vue';
 
-import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY, createRouterKey } from '../core/constants';
+import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY } from '../core/constants';
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
 import type { RouteMap, TypedPush } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
@@ -122,9 +122,11 @@ export function useGlobalMicroRouter(
     if (page === defaultPage && oldPage !== defaultPage) {
       tracker.trackGuiEnter(active);
     }
-    // Devtools: emit navigation event and refresh inspector
-    emitDevtoolsEvent('navigate', { from: oldPage, to: page });
-    refreshDevtoolsInspector();
+    // Devtools: emit navigation event (dev-only — zero cost in production)
+    if ((import.meta as any).env?.DEV) {
+      emitDevtoolsEvent('navigate', { from: oldPage, to: page });
+      refreshDevtoolsInspector();
+    }
   });
 
   // Lifecycle
