@@ -41,8 +41,14 @@
     },
     "./styles": "./dist/styles.css"
   },
-  "files": ["dist", "README.md", "LICENSE"],
-  "sideEffects": ["*.css"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
   "peerDependencies": {
     "vue": "^3.4.0",
     "howler": "^2.2.0",
@@ -81,8 +87,6 @@
     "lint:fix": "eslint libs/ examples/ tests/ --fix",
     "gen:types": "bun run scripts/gen-attrs-types.ts",
     "test": "bun test",
-    "bench": "bun run benchmarks/navigation-bench.ts",
-    "bench:size": "bun run benchmarks/bundle-size-check.ts",
     "dev:example": "vite --config examples/vite.config.ts examples",
     "prepublishOnly": "bun run build"
   }
