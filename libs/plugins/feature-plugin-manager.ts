@@ -17,9 +17,13 @@ import type {
  * });
  * ```
  */
-export function defineFeaturePlugin(
-  config: FeaturePluginConfig
-): FeaturePlugin {
+/**
+ * Generic overload preserves literal path/name types when `as const` is used.
+ * Without `as const`, falls back to loose FeaturePlugin type (backward compatible).
+ */
+export function defineFeaturePlugin<const T extends FeaturePluginConfig>(config: T): T;
+export function defineFeaturePlugin(config: FeaturePluginConfig): FeaturePlugin;
+export function defineFeaturePlugin(config: FeaturePluginConfig): FeaturePlugin {
   return { ...config };
 }
 

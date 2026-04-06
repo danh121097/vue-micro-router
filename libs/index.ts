@@ -41,7 +41,14 @@ export type {
   RouteMap,
   RoutesWithProps,
   RoutesWithoutProps,
-  TypedPush
+  TypedPush,
+  ExtractRoutePaths,
+  ExtractDialogPaths,
+  ExtractControlNames,
+  PluginTypedPush,
+  PluginTypedOpenDialog,
+  PluginTypedCloseDialog,
+  PluginTypedToggleControl
 } from './core/type-helpers';
 
 // ── Constants ──
@@ -62,7 +69,7 @@ export {
   useGlobalMicroRouter,
   useMicroRouter
 } from './composables/use-micro-router';
-export type { TypedMicroRouterStore } from './composables/use-micro-router';
+export type { TypedMicroRouterStore, PluginTypedMicroRouterStore } from './composables/use-micro-router';
 export { useMicroState } from './composables/use-micro-state';
 export { useRouteLifecycle } from './composables/navigation/use-route-lifecycle';
 export type { RouteLifecycleHooks } from './composables/navigation/use-route-lifecycle';

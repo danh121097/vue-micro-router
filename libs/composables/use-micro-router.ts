@@ -20,7 +20,18 @@ import {
 
 import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY } from '../core/constants';
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
-import type { RouteMap, TypedPush } from '../core/type-helpers';
+import type {
+  RouteMap,
+  TypedPush,
+  ExtractRoutePaths,
+  ExtractDialogPaths,
+  ExtractControlNames,
+  IsPluginConfig,
+  PluginTypedPush,
+  PluginTypedOpenDialog,
+  PluginTypedCloseDialog,
+  PluginTypedToggleControl
+} from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './control/use-control-manager';
 import { setupDevtoolsPlugin, emitDevtoolsEvent, refreshDevtoolsInspector } from '../devtools/devtools-plugin';
@@ -158,36 +169,62 @@ export function useGlobalMicroRouter(
   return store;
 }
 
-/** Typed store — replaces push() with type-safe overloads when a RouteMap generic is provided */
+/** Typed store from manual RouteMap — push() validates route names + props */
 export type TypedMicroRouterStore<T extends RouteMap> = Omit<MicroRouterStore, 'push'> & {
   push: TypedPush<T>;
 };
 
 /**
- * Inject the MicroRouter store from a parent MicroRouterView.
- * Must be called within the MicroRouterView component tree.
- *
- * @example Untyped (default)
- * ```ts
- * const router = useMicroRouter();
- * router.push('page', { any: 'props' });
- * ```
- *
- * @example Typed (opt-in)
- * ```ts
- * interface AppRoutes { home: undefined; profile: { userId: number } }
- * const router = useMicroRouter<AppRoutes>();
- * router.push('profile', { userId: 42 }); // OK
- * router.push('typo');                     // TS error
- * ```
+ * Typed store from plugin(s) — push/openDialog/closeDialog/toggleControl all validate names.
+ * Accepts single plugin or union of plugins: `typeof pluginA | typeof pluginB`
  */
+export type PluginTypedMicroRouterStore<T> = Omit<
+  MicroRouterStore,
+  'push' | 'openDialog' | 'closeDialog' | 'toggleControl'
+> & {
+  push: PluginTypedPush<ExtractRoutePaths<T>>;
+  openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>>;
+  closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<T>>;
+  toggleControl: PluginTypedToggleControl<ExtractControlNames<T>>;
+};
+
 export interface UseMicroRouterOptions {
   /** If true, injects the root (outermost) router instead of the nearest parent */
   root?: boolean;
 }
 
+/**
+ * Inject the MicroRouter store from a parent MicroRouterView.
+ *
+ * @example Untyped (default)
+ * ```ts
+ * const store = useMicroRouter();
+ * ```
+ *
+ * @example Typed from plugin (recommended — zero duplication)
+ * ```ts
+ * const plugin = defineFeaturePlugin({ ... } as const);
+ * const store = useMicroRouter<typeof plugin>();
+ * store.push('shop');              // OK
+ * store.openDialog('buy-confirm'); // OK
+ * store.toggleControl('hud', true); // OK
+ * ```
+ *
+ * @example Multiple plugins
+ * ```ts
+ * const store = useMicroRouter<typeof shopPlugin | typeof authPlugin>();
+ * ```
+ *
+ * @example Manual RouteMap (for typed props)
+ * ```ts
+ * interface AppRoutes { home: undefined; profile: { userId: number } }
+ * const store = useMicroRouter<AppRoutes>();
+ * store.push('profile', { userId: 42 }); // OK
+ * ```
+ */
 export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore;
 export function useMicroRouter<T extends RouteMap>(options?: UseMicroRouterOptions): TypedMicroRouterStore<T>;
+export function useMicroRouter<T extends { name: string }>(options?: UseMicroRouterOptions): PluginTypedMicroRouterStore<T>;
 export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore {
   const key = options?.root ? MICRO_ROUTER_ROOT_KEY : MICRO_ROUTER_KEY;
   const store = inject(key);
