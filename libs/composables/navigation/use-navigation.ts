@@ -278,11 +278,18 @@ export function useNavigation(
     const currentSegments = parsePathSegments(state.activePath);
     const existingIndex = currentSegments.indexOf(dest);
     if (existingIndex !== -1) {
-      state.routeKeys.set(dest, (state.routeKeys.get(dest) || 0) + 1);
-      const targetPath = buildPathFromSegments(
-        currentSegments.slice(0, existingIndex + 1)
-      );
-      await navigateToPath(targetPath, props);
+      const stepsBack = currentSegments.length - (existingIndex + 1);
+      if (stepsBack > 0) {
+        // Popping to an earlier segment — use navigateBack for clean slide-out
+        navigateBack(stepsBack, props);
+      } else {
+        // Re-navigating to current top segment — force remount
+        state.routeKeys.set(dest, (state.routeKeys.get(dest) || 0) + 1);
+        await navigateToPath(
+          buildPathFromSegments(currentSegments.slice(0, existingIndex + 1)),
+          props
+        );
+      }
       return;
     }
 
