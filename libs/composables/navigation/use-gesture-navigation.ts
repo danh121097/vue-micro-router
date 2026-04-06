@@ -21,8 +21,8 @@ export interface GestureConfig {
 }
 
 interface GestureContext {
-  /** The DOM element to attach gesture listeners to */
-  containerRef: Ref<HTMLElement | null>;
+  /** The DOM element or Vue component instance ref to attach gesture listeners to */
+  containerRef: Ref<HTMLElement | Record<string, unknown> | null>;
   /** Go back one step — respects guards */
   goBack: () => Promise<void>;
   /** Check if there's a page to go back to */
@@ -46,8 +46,16 @@ export function useGestureNavigation(
   let currentPage: HTMLElement | null = null;
   let prevPage: HTMLElement | null = null;
 
+  /** Resolve the actual DOM element — handles both raw HTMLElement refs and Vue component instance refs ($el) */
+  function resolveElement(): HTMLElement | null {
+    const ref = ctx.containerRef.value;
+    if (!ref) return null;
+    if ('$el' in ref) return (ref as any).$el as HTMLElement;
+    return ref as HTMLElement;
+  }
+
   function getPages(): { current: HTMLElement | null; previous: HTMLElement | null } {
-    const container = ctx.containerRef.value;
+    const container = resolveElement();
     if (!container) return { current: null, previous: null };
     const pages = container.querySelectorAll<HTMLElement>('.route-page');
     if (pages.length < 2) return { current: pages[pages.length - 1] ?? null, previous: null };
@@ -169,8 +177,8 @@ export function useGestureNavigation(
   }
 
   onMounted(() => {
-    const el = ctx.containerRef.value;
-    if (!el) return;
+    const el = resolveElement();
+    if (!el?.addEventListener) return;
     el.addEventListener('pointerdown', onPointerDown, { passive: true });
     el.addEventListener('pointermove', onPointerMove, { passive: true });
     el.addEventListener('pointerup', onPointerUp, { passive: true });
@@ -178,8 +186,8 @@ export function useGestureNavigation(
   });
 
   onBeforeUnmount(() => {
-    const el = ctx.containerRef.value;
-    if (!el) return;
+    const el = resolveElement();
+    if (!el?.removeEventListener) return;
     el.removeEventListener('pointerdown', onPointerDown);
     el.removeEventListener('pointermove', onPointerMove);
     el.removeEventListener('pointerup', onPointerUp);
