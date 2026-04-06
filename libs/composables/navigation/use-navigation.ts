@@ -12,6 +12,7 @@
  */
 import {
   computed,
+  nextTick,
   reactive,
   shallowReactive,
   type AsyncComponentLoader,
@@ -260,13 +261,14 @@ export function useNavigation(
         if (stepsBack === 1) {
           navigateBack(1, props);
         } else {
-          // Multi-step: collapse intermediates instantly, animate only the last step
+          // Multi-step: collapse intermediates first, wait for DOM update, then animate final step
           const intermediateSegments = currentSegments.slice(0, segments.length + 1);
           const intermediatePath = buildPathFromSegments(intermediateSegments);
           currentSegments.slice(segments.length + 1).forEach((seg) => {
             state.routeAttrs.delete(seg);
           });
           state.activePath = intermediatePath;
+          await nextTick(); // let Vue remove intermediate pages from DOM
           navigateBack(1, props);
         }
         return;
@@ -303,7 +305,7 @@ export function useNavigation(
           state.routeAttrs.delete(seg);
         });
         state.activePath = intermediatePath;
-        // Now animate the final step back
+        await nextTick(); // let Vue remove intermediate pages from DOM
         navigateBack(1, props);
       } else {
         // Re-navigating to current top segment — force remount
