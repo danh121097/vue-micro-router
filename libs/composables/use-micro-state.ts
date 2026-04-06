@@ -7,27 +7,44 @@
  *
  * flush: 'post' batches the write-back watcher after the render cycle ends.
  */
-import { inject, reactive, toRefs, watch, type ToRefs } from 'vue';
+import { inject, reactive, toRefs, watch, type Ref } from 'vue';
 
 import { MICRO_ATTRS_READ_KEY, MICRO_ATTRS_WRITE_KEY } from '../core/constants';
+
+/**
+ * Like ToRefs but all keys are required (ref always exists).
+ * Optional fields → Ref<T | undefined> (value may be undefined, ref itself never is).
+ * Required fields → Ref<T> (value always present).
+ *
+ * This means: `meta.value?.title` ✅ (not `meta?.value?.title`)
+ */
+type StateRefs<T extends object> = {
+  [K in keyof T]-?: Ref<T[K]>;
+};
 
 /**
  * Reactive state bridge for routes, dialogs, and controls.
  * Auto-reads attrs from parent wrapper (RoutePage/MicroDialog/MicroControlWrapper).
  * Mutations auto-sync back to the store — state survives remount.
  *
+ * Returns a reactive object — no `.value` needed, works like Vue's `reactive()`.
+ * Reactive in template: `{{ state.userId }}` auto-updates.
+ * Writable: `state.userId = 42` triggers sync back to store.
+ *
  * @example
  * ```ts
- * // Type-only — reads whatever was passed via push()/openDialog()/toggleControl()
- * const { userId } = useMicroState<{ userId: number }>();
+ * const state = useMicroState<{ userId: number; username: string }>();
+ * state.userId   // number — no .value
+ * state.userId = 42  // reactive, syncs back
  *
- * // With defaults — fills missing values
- * const { count } = useMicroState({ count: 0 });
+ * // With defaults
+ * const state = useMicroState({ count: 0 });
+ * state.count++  // reactive
  * ```
  */
-export function useMicroState<T extends object>(): ToRefs<T>;
-export function useMicroState<T extends object>(defaults: T): ToRefs<T>;
-export function useMicroState<T extends object>(defaults?: T): ToRefs<T> {
+export function useMicroState<T extends object>(): StateRefs<T>;
+export function useMicroState<T extends object>(defaults: T): StateRefs<T>;
+export function useMicroState<T extends object>(defaults?: T): StateRefs<T> {
   const readAttrs = inject(MICRO_ATTRS_READ_KEY);
   const writeAttrs = inject(MICRO_ATTRS_WRITE_KEY);
 
@@ -57,5 +74,5 @@ export function useMicroState<T extends object>(defaults?: T): ToRefs<T> {
     );
   }
 
-  return toRefs(state) as ToRefs<T>;
+  return toRefs(state) as StateRefs<T>;
 }

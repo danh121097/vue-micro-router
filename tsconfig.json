@@ -9,14 +9,21 @@
     "declarationDir": "./dist",
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "rootDir": "./libs",
+    "rootDir": ".",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": [],
+    "types": ["bun-types"],
     "skipLibCheck": true,
     "paths": {
       "@/*": ["./libs/*"]
     }
   },
-  "include": ["libs/**/*.ts", "libs/**/*.vue"],
+  "include": [
+    "libs/**/*.ts",
+    "libs/**/*.vue",
+    "examples/**/*.ts",
+    "examples/**/*.vue",
+    "tests/**/*.ts",
+    "vue-micro-router.d.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

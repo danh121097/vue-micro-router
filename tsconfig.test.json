@@ -1,10 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "rootDir": ".",
-    "types": ["bun-types"],
     "declaration": false,
+    "declarationDir": null,
     "emitDeclarationOnly": false
-  },
-  "include": ["libs/**/*.ts", "libs/**/*.vue", "tests/**/*.ts", "examples/**/*.ts", "examples/**/*.vue"]
+  }
 }

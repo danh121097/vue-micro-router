@@ -27,6 +27,8 @@ import type {
   ExtractDialogPaths,
   ExtractControlNames,
   PluginTypedPush,
+  PluginTypedStepWisePush,
+  PluginTypedStepWiseBack,
   PluginTypedOpenDialog,
   PluginTypedCloseDialog,
   PluginTypedToggleControl,
@@ -189,9 +191,11 @@ export type TypedMicroRouterStore<T extends RouteMap> = Omit<
  */
 export type PluginTypedMicroRouterStore<T> = Omit<
   MicroRouterStore,
-  'push' | 'openDialog' | 'closeDialog' | 'toggleControl'
+  'push' | 'stepWisePush' | 'stepWiseBack' | 'openDialog' | 'closeDialog' | 'toggleControl'
 > & {
   push: PluginTypedPush<ExtractRoutePaths<T>>;
+  stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<T>>;
+  stepWiseBack: PluginTypedStepWiseBack;
   openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>>;
   closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<T>>;
   toggleControl: PluginTypedToggleControl<ExtractControlNames<T>>;
@@ -241,7 +245,7 @@ export function useMicroRouter<T extends { name: string }>(
 ): PluginTypedMicroRouterStore<T>;
 export function useMicroRouter(
   options?: UseMicroRouterOptions
-): MicroRouterStore {
+): any {
   const key = options?.root ? MICRO_ROUTER_ROOT_KEY : MICRO_ROUTER_KEY;
   const store = inject(key);
   if (!store) {

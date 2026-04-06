@@ -1,16 +1,18 @@
 <script setup lang="ts">
-/**
- * Confirm dialog — demonstrates reading dialog props and closing.
- */
 import { useMicroState } from '../../libs/index';
 
-// onClose is auto-injected by the dialog system via v-bind="dialog.attrs"
-// Optional because attrs are set via nextTick — may be undefined on first render
+/** Exported for auto-generated dialog attrs type mapping */
+export interface Attrs {
+  title?: string;
+  message?: string;
+  onConfirm?: () => void;
+}
+
 const props = withDefaults(defineProps<{ onClose?: () => void }>(), {
-  onClose: () => {},
+  onClose: () => {}
 });
 
-const { title, message, onConfirm } = useMicroState({
+const { title, message, onConfirm } = useMicroState<Attrs>({
   title: 'Confirm',
   message: 'Are you sure?',
   onConfirm: () => {
@@ -19,7 +21,7 @@ const { title, message, onConfirm } = useMicroState({
 });
 
 function handleConfirm() {
-  onConfirm.value();
+  onConfirm?.value?.();
   props.onClose();
 }
 </script>

@@ -58,26 +58,56 @@ export type ExtractControlNames<T> =
     ? C extends { name: infer N } ? N & string : never
     : never;
 
-/** Typed push that validates route segment names inferred from plugins */
-export interface PluginTypedPush<Routes extends string> {
-  (destination: Routes, props?: Record<string, unknown>): Promise<void>;
-  (destination: number): Promise<void>;
+/**
+ * Per-call generic: TypeScript infers K from the destination string literal,
+ * then resolves props type specifically for that route.
+ * K extends keyof AttrsMap → AttrsMap[K]
+ * K not in AttrsMap → Record<string, unknown>
+ */
+
+/**
+ * Conditional rest args pattern:
+ * - Route in AttrsMap → [props: AttrsMap[K]] (required)
+ * - Route not in AttrsMap → [props?: Record<string, unknown>] (optional)
+ */
+export interface PluginTypedPush<Routes extends string, AttrsMap = {}> {
+  <K extends Routes>(
+    destination: K,
+    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
+  ): Promise<void>;
+  (destination: number, props?: Record<string, unknown>): Promise<void>;
   (destination: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
-/** Typed openDialog that validates dialog paths inferred from plugins */
-export interface PluginTypedOpenDialog<Dialogs extends string> {
-  (path: Dialogs, props?: Record<string, unknown>): { path: string; attrs?: Record<string, unknown> };
+export interface PluginTypedStepWisePush<Routes extends string, AttrsMap = {}> {
+  <K extends Routes>(
+    targetPath: K,
+    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
+  ): Promise<void>;
+  (targetPath: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
-/** Typed closeDialog that validates dialog paths */
+export interface PluginTypedStepWiseBack {
+  (steps: number): Promise<void>;
+}
+
+export interface PluginTypedOpenDialog<Dialogs extends string, AttrsMap = {}> {
+  <K extends Dialogs>(
+    path: K,
+    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
+  ): { path: string; attrs?: Record<string, unknown> };
+}
+
 export interface PluginTypedCloseDialog<Dialogs extends string> {
   (path: Dialogs): void;
 }
 
-/** Typed toggleControl that validates control names inferred from plugins */
-export interface PluginTypedToggleControl<Controls extends string> {
-  (name: Controls, active: boolean, attrs?: Record<string, unknown>): void;
+export interface PluginTypedToggleControl<Controls extends string, AttrsMap = {}> {
+  <K extends Controls>(
+    name: K,
+    active: boolean,
+    ...args: K extends keyof AttrsMap ? [attrs: AttrsMap[K]] : [attrs?: Record<string, unknown>]
+  ): void;
 }
 
 /**
@@ -87,30 +117,47 @@ export interface PluginTypedToggleControl<Controls extends string> {
  */
 export type IsPluginConfig<T> = T extends { name: string } ? true : false;
 
-// ── Module Augmentation — Register pattern ──────────────────────────────────
+// ── Module Augmentation ─────────────────────────────────────────────────────
 //
-// Declare your plugin type ONCE, then useMicroRouter() auto-infers everywhere.
+// 1. Register — plugin type (declare once in app-plugin.ts)
+// 2. RouteAttrsMap / DialogAttrsMap / ControlAttrsMap — per-component attrs
 //
-// ```ts
-// // env.d.ts or app-plugin.ts — declare once
+// Each component declares its own attrs type. TS interface merging combines all.
+//
+// ```vue
+// <!-- ProfilePage.vue -->
+// <script lang="ts">
 // declare module 'vue-micro-router' {
-//   interface Register {
-//     plugin: typeof appPlugin;
+//   interface RouteAttrsMap {
+//     profile: { userId: number; username: string };
 //   }
 // }
-//
-// // Any component — no generic needed
-// const { push } = useMicroRouter();
-// push('home');      // ✅ type-safe
-// push('unknown');   // ❌ compile error
+// </script>
 // ```
+//
+// Then push('profile', { userId: 42, username: 'Danh' }) is fully typed.
+
+/** Register plugin type — declare once in app-plugin.ts */
+export interface Register {}
 
 /**
- * Module augmentation interface. Users extend this to register their plugin type.
- * Accepts `plugin` (single or union of plugins) or `routeMap` (manual RouteMap).
+ * Per-route attrs — augment from each route component.
+ * Keys = route path strings, values = attrs type for that route.
+ * TS interface merging combines declarations across all files.
  */
- 
-export interface Register {}
+export interface RouteAttrsMap {}
+
+/**
+ * Per-dialog attrs — augment from each dialog component.
+ * Keys = dialog path strings, values = attrs type for that dialog.
+ */
+export interface DialogAttrsMap {}
+
+/**
+ * Per-control attrs — augment from each control component.
+ * Keys = control name strings, values = attrs type for that control.
+ */
+export interface ControlAttrsMap {}
 
 /** Resolved plugin type from Register — `never` if not augmented */
 export type RegisteredPlugin =
@@ -119,6 +166,11 @@ export type RegisteredPlugin =
 /** Resolved route map from Register — `never` if not augmented */
 export type RegisteredRouteMap =
   Register extends { routeMap: infer T extends RouteMap } ? T : never;
+
+/** Resolved attrs maps — from augmented interfaces */
+export type RegisteredRouteAttrs = RouteAttrsMap;
+export type RegisteredDialogAttrs = DialogAttrsMap;
+export type RegisteredControlAttrs = ControlAttrsMap;
 
 /** True if user has augmented Register with a plugin */
 export type HasRegisteredPlugin = [RegisteredPlugin] extends [never] ? false : true;
@@ -129,19 +181,20 @@ export type HasRegisteredRouteMap = [RegisteredRouteMap] extends [never] ? false
 /**
  * Auto-resolved store type based on Register augmentation.
  * Priority: plugin > routeMap > untyped MicroRouterStore
- *
- * Defined inline (no circular import back to use-micro-router.ts).
+ * Attrs maps (routeAttrs/dialogAttrs/controlAttrs) are passed through when declared.
  */
 export type ResolvedMicroRouterStore =
   HasRegisteredPlugin extends true
     ? Omit<
         import('./types').MicroRouterStore,
-        'push' | 'openDialog' | 'closeDialog' | 'toggleControl'
+        'push' | 'stepWisePush' | 'stepWiseBack' | 'openDialog' | 'closeDialog' | 'toggleControl'
       > & {
-        push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin>>;
-        openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin>>;
+        push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
+        stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
+        stepWiseBack: PluginTypedStepWiseBack;
+        openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin>, RegisteredDialogAttrs>;
         closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<RegisteredPlugin>>;
-        toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin>>;
+        toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin>, RegisteredControlAttrs>;
       }
     : HasRegisteredRouteMap extends true
       ? Omit<import('./types').MicroRouterStore, 'push'> & {

@@ -1,25 +1,27 @@
 <script setup lang="ts">
-/**
- * Profile page — demonstrates:
- *   - Type-safe routes via Register (auto-typed useMicroRouter())
- *   - Props via push() + useMicroState
- *   - Route preloading (adjacent) and viewTransition (configured in App.vue)
- *   - Per-route beforeEnter guard (configured in App.vue)
- */
 import {
   useMicroRouter,
   useMicroState,
   useRouteLifecycle
 } from '../../libs/index';
 
-// Auto-typed via Register — validates route/dialog/control names
-const router = useMicroRouter();
+/** Exported for auto-generated route attrs type mapping */
+export interface Attrs {
+  userId: number;
+  username: string;
+  meta?: {
+    title: string;
+  };
+}
 
-const { userId, username } = useMicroState({ userId: 0, username: 'Guest' });
+const router = useMicroRouter();
+const { userId, username, meta } = useMicroState<Attrs>();
 
 useRouteLifecycle({
   onRouteEnter: () =>
-    console.log(`[ProfilePage] entered — userId=${userId.value}`),
+    console.log(
+      `[ProfilePage] entered — userId=${userId.value} username=${username.value} meta.title=${meta.value?.title}`
+    ),
   onRouteLeave: () => console.log('[ProfilePage] left')
 });
 </script>
@@ -62,7 +64,8 @@ const store = useMicroRouter();
 store.push('profile');               // OK
 store.push('typo');                  // TS Error
 store.openDialog('confirm');         // OK
-store.toggleControl('main_hud', true); // OK</pre>
+store.toggleControl('main_hud', true); // OK</pre
+      >
     </div>
 
     <div class="info">

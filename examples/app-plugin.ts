@@ -32,15 +32,5 @@ export const appPlugin = defineFeaturePlugin({
   controls: [{ name: 'main_hud', component: MainHUD, activated: false }]
 } as const);
 
-/** Plugin type — registered globally so useMicroRouter() is auto-typed */
+/** Plugin type — auto-registered via `bun run gen:types` → vue-micro-router.d.ts */
 export type AppPlugin = typeof appPlugin;
-
-/**
- * Module augmentation — declare once, typed everywhere.
- * After this, useMicroRouter() returns a fully typed store without generics.
- */
-declare module '../libs/index' {
-  interface Register {
-    plugin: AppPlugin;
-  }
-}

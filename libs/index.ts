@@ -50,7 +50,13 @@ export type {
   PluginTypedCloseDialog,
   PluginTypedToggleControl,
   Register,
+  RouteAttrsMap,
+  DialogAttrsMap,
+  ControlAttrsMap,
   RegisteredPlugin,
+  RegisteredRouteAttrs,
+  RegisteredDialogAttrs,
+  RegisteredControlAttrs,
   ResolvedMicroRouterStore
 } from './core/type-helpers';
 

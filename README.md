@@ -46,18 +46,16 @@ npm install vue-micro-router
 ## Quick Start
 
 ```vue
-<!-- App.vue -->
-<script setup>
-import { MicroRouterView, defineFeaturePlugin } from 'vue-micro-router';
-import 'vue-micro-router/styles';
-
+<!-- app-plugin.ts — declare once, typed everywhere -->
+<script lang="ts">
+import { defineFeaturePlugin } from 'vue-micro-router';
 import HomePage from './pages/HomePage.vue';
 import MenuPage from './pages/MenuPage.vue';
 import SettingsPage from './pages/SettingsPage.vue';
 import ConfirmDialog from './dialogs/ConfirmDialog.vue';
 import MainGUI from './controls/MainGUI.vue';
 
-const plugin = defineFeaturePlugin({
+export const appPlugin = defineFeaturePlugin({
   name: 'app',
   routes: [
     { path: 'home', component: HomePage },
@@ -71,25 +69,40 @@ const plugin = defineFeaturePlugin({
   controls: [
     { name: 'main_gui', component: MainGUI, activated: false },
   ],
-});
+} as const);
+
+// Register plugin type globally — no generics needed in useMicroRouter()
+declare module 'vue-micro-router' {
+  interface Register {
+    plugin: typeof appPlugin;
+  }
+}
+</script>
+```
+
+```vue
+<!-- App.vue — fully typed without generics -->
+<script setup>
+import { MicroRouterView } from 'vue-micro-router';
+import 'vue-micro-router/styles';
+import { appPlugin } from './app-plugin';
+
+const config = {
+  defaultPath: 'home',
+  defaultControlName: 'main_gui',
+  history: { enabled: true, maxEntries: 50 },
+  gesture: { enabled: true },
+  guards: {
+    beforeEach: [(to, from) => {
+      console.log(`Navigating: ${from} → ${to}`);
+      return true;
+    }],
+  },
+};
 </script>
 
 <template>
-  <MicroRouterView
-    :config="{
-      defaultPath: 'home',
-      defaultControlName: 'main_gui',
-      history: { enabled: true, maxEntries: 50 },
-      gesture: { enabled: true },
-      guards: {
-        beforeEach: [(to, from) => {
-          console.log(`Navigating: ${from} → ${to}`);
-          return true;
-        }],
-      },
-    }"
-    :plugins="[plugin]"
-  />
+  <MicroRouterView :config :plugins="[appPlugin]" />
 </template>
 ```
 
@@ -220,10 +233,12 @@ History truncates forward entries on new push (browser behavior).
 
 ### Type-Safe Routes
 
-#### Register pattern (recommended — declare once, typed everywhere)
+#### Register Pattern (Recommended)
+
+Use `Register` module augmentation to declare your plugin type once. Then `useMicroRouter()` auto-infers everywhere — no generics needed.
 
 ```ts
-// app-plugin.ts — declare your plugin type once
+// app-plugin.ts — declare once with `as const`
 export const appPlugin = defineFeaturePlugin({
   name: 'my-app',
   routes: [
@@ -234,7 +249,7 @@ export const appPlugin = defineFeaturePlugin({
   controls: [{ name: 'main_hud', component: MainHUD, activated: false }],
 } as const);
 
-// Register globally — this is the only place you write the type
+// Declare module once — this is the ONLY place you write the type
 declare module 'vue-micro-router' {
   interface Register {
     plugin: typeof appPlugin;
@@ -242,8 +257,10 @@ declare module 'vue-micro-router' {
 }
 ```
 
+Then everywhere:
+
 ```ts
-// Any component — no generic needed, fully typed automatically
+// Any component — fully typed, zero generics
 const { push, openDialog, toggleControl } = useMicroRouter();
 push('profile');                    // ✅ OK
 push('typo');                       // ❌ TS Error
@@ -251,19 +268,25 @@ openDialog('confirm');              // ✅ OK
 toggleControl('main_hud', true);    // ✅ OK
 ```
 
-#### Manual route map (for typed props)
+**Benefits:** Type-safe push/openDialog/closeDialog/toggleControl. No duplication. One declaration fixes all usages.
+
+#### Manual Route Map (Alternative)
+
+For simple cases or when you only need typed props (not route names):
 
 ```ts
 interface AppRoutes {
   home: undefined;
   profile: { userId: number };
 }
+
 const router = useMicroRouter<AppRoutes>();
-router.push('profile', { userId: 42 }); // OK
-router.push('profile');                  // TS Error: missing props
+router.push('profile', { userId: 42 }); // ✅ OK
+router.push('profile');                  // ❌ TS Error: missing props
+router.push('unknown');                  // ❌ TS Error: unknown route
 ```
 
-Both patterns work. Untyped `useMicroRouter()` without Register still returns `MicroRouterStore`.
+**Untyped:** `useMicroRouter()` without Register returns `MicroRouterStore` with untyped methods.
 
 ### State Serialization
 
@@ -526,6 +549,17 @@ import 'vue-micro-router/styles';
 ```
 
 Includes page slide/fade transitions, dialog animations, control fade transitions, and GUI layer positioning.
+
+## Development
+
+```bash
+bun run lint       # ESLint check
+bun run lint:fix   # Auto-fix lint issues
+bun test           # Run all tests
+bun run typecheck  # TypeScript strict check
+bun run build      # Build package
+bun run dev:example # Run example app
+```
 
 ## API Reference
 
