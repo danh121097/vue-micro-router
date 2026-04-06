@@ -1,63 +1,13 @@
 <script setup lang="ts">
 /**
- * Root app — showcases all vue-micro-router features:
- *   - Global navigation guards (auth check)
- *   - Per-route transitions (slide/fade/none)
- *   - Navigation history (back/forward)
- *   - Gesture navigation (swipe-back)
- *   - Route preloading (eager/adjacent)
- *   - View Transition API
- *   - Nested routers
- *   - State serialization
- *   - Devtools (auto-enabled in dev mode)
+ * Root app — showcases all vue-micro-router features including type-safe plugin inference.
  */
-import { MicroRouterView, defineFeaturePlugin } from '../libs/index';
+import { MicroRouterView } from '../libs/index';
 import type { NavigationGuard } from '../libs/index';
 import '../libs/styles/index.css';
 
 import { isAuthenticated } from './auth-state';
-import HomePage from './pages/HomePage.vue';
-import SettingsPage from './pages/SettingsPage.vue';
-import ProfilePage from './pages/ProfilePage.vue';
-import AdminPage from './pages/AdminPage.vue';
-import NestedDemoPage from './pages/NestedDemoPage.vue';
-import ConfirmDialog from './dialogs/ConfirmDialog.vue';
-import MainHUD from './controls/MainHUD.vue';
-
-const appPlugin = defineFeaturePlugin({
-  name: 'showcase-app',
-  routes: [
-    {
-      path: 'home',
-      component: HomePage
-    },
-    {
-      path: 'settings',
-      component: SettingsPage
-    },
-    {
-      path: 'profile',
-      component: ProfilePage,
-      preload: 'adjacent',
-      viewTransition: true,
-      beforeEnter: (_to, _from) => {
-        console.log('[Guard] Allowing profile entry');
-        return true;
-      }
-    },
-    {
-      path: 'admin',
-      component: AdminPage
-    },
-    {
-      path: 'nested',
-      component: NestedDemoPage,
-      preload: 'eager'
-    }
-  ],
-  dialogs: [{ path: 'confirm', component: ConfirmDialog, activated: false }],
-  controls: [{ name: 'main_hud', component: MainHUD, activated: false }]
-});
+import { appPlugin } from './app-plugin';
 
 /** Global guard — blocks admin page unless authenticated */
 const authGuard: NavigationGuard = (to, _from) => {
@@ -90,14 +40,6 @@ const analyticsHook = (to: string, from: string) => {
 </template>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-body {
-  font-family: system-ui, sans-serif;
-  background: #0f172a;
-  color: #e2e8f0;
-}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
 </style>

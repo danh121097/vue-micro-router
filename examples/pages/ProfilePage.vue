@@ -7,22 +7,10 @@
  *   - Per-route beforeEnter guard (configured in App.vue)
  */
 import { useMicroRouter, useMicroState, useRouteLifecycle } from '../../libs/index';
-import type { TypedMicroRouterStore, RouteMap } from '../../libs/index';
+import type { AppPlugin } from '../app-plugin';
 
-/**
- * Type-safe route map — define once, use everywhere.
- * Pass as generic to useMicroRouter<AppRoutes>() for typed push().
- */
-interface AppRoutes extends RouteMap {
-  home: undefined;
-  settings: { tab?: string };
-  profile: { userId: number; username: string };
-  admin: undefined;
-  nested: undefined;
-}
-
-// Typed router — push validates route names and props at compile time
-const router = useMicroRouter<AppRoutes>() as TypedMicroRouterStore<AppRoutes>;
+// Type-safe store inferred from plugin — validates route/dialog/control names
+const router = useMicroRouter<AppPlugin>();
 
 const { userId, username } = useMicroState({ userId: 0, username: 'Guest' });
 
@@ -56,17 +44,18 @@ useRouteLifecycle({
     </div>
 
     <div class="info">
-      <h3>Type-Safe Routes</h3>
-      <p>Define a <code>RouteMap</code> interface, pass as generic:</p>
-      <pre class="code-block">interface AppRoutes extends RouteMap {
-  home: undefined;
-  profile: { userId: number; username: string };
-}
+      <h3>Type-Safe from Plugin</h3>
+      <p>Use <code>as const</code> on plugin, pass type to store:</p>
+      <pre class="code-block">// app-plugin.ts
+export const plugin = defineFeaturePlugin({ ... } as const);
+export type AppPlugin = typeof plugin;
 
-const router = useMicroRouter&lt;AppRoutes&gt;();
-router.push('profile', { userId: 42 }); // OK
-router.push('profile'); // TS error: missing props
-router.push('typo');    // TS error: not in AppRoutes</pre>
+// Any component — validates all names:
+const store = useMicroRouter&lt;AppPlugin&gt;();
+store.push('profile');               // OK
+store.push('typo');                  // TS Error
+store.openDialog('confirm');         // OK
+store.toggleControl('main_hud', true); // OK</pre>
     </div>
 
     <div class="info">

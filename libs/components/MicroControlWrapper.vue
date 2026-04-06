@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { provide } from 'vue';
 
-import { MICRO_ATTRS_READ_KEY, MICRO_ATTRS_WRITE_KEY, MICRO_CONTROL_NAME_KEY } from '../core/constants';
+import {
+  MICRO_ATTRS_READ_KEY,
+  MICRO_ATTRS_WRITE_KEY,
+  MICRO_CONTROL_NAME_KEY
+} from '../core/constants';
 import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroControl } from '../core/types';
 

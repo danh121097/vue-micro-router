@@ -8,7 +8,9 @@
 import { computed } from 'vue';
 import { useMicroRouter, useRouteLifecycle } from '../../libs/index';
 import type { SerializedState } from '../../libs/index';
+import type { AppPlugin } from '../app-plugin';
 
+// Type-safe store — push('typo') and openDialog('nope') are TS errors
 const {
   push,
   openDialog,
@@ -18,7 +20,7 @@ const {
   historyForward,
   serialize,
   restore
-} = useMicroRouter();
+} = useMicroRouter<AppPlugin>();
 
 const hasSavedState = computed(() => !!localStorage.getItem('vmr-snapshot'));
 

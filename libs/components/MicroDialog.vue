@@ -1,11 +1,15 @@
 <script setup lang="ts">
 /**
  * Headless dialog using native <dialog> element.
- * No reka-ui dependency — native focus trap, backdrop, escape key handling.
+ * No dependency — native focus trap, backdrop, escape key handling.
  */
 import { computed, nextTick, onMounted, provide, ref, watch } from 'vue';
 
-import { MICRO_ATTRS_READ_KEY, MICRO_ATTRS_WRITE_KEY, MICRO_DIALOG_PATH_KEY } from '../core/constants';
+import {
+  MICRO_ATTRS_READ_KEY,
+  MICRO_ATTRS_WRITE_KEY,
+  MICRO_DIALOG_PATH_KEY
+} from '../core/constants';
 import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroDialog } from '../core/types';
 

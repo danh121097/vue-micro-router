@@ -3,7 +3,9 @@
  * Main HUD control — persistent overlay with navigation, history, and state controls.
  */
 import { useMicroRouter } from '../../libs/index';
+import type { AppPlugin } from '../app-plugin';
 
+// Type-safe store — validates route/dialog/control names at compile time
 const {
   activePage,
   push,
@@ -13,7 +15,7 @@ const {
   historyBack,
   historyForward,
   serialize,
-} = useMicroRouter();
+} = useMicroRouter<AppPlugin>();
 
 function saveState() {
   if (!serialize) return;
