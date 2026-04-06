@@ -42,10 +42,14 @@ export interface MicroRoute {
   attrs?: Record<string, unknown>;
   /** Background music track name — resolved by audio manager's urlResolver */
   bgm?: string;
+  /** Preloading strategy: 'eager' (on mount), 'adjacent' (after each nav), false (default) */
+  preload?: 'eager' | 'adjacent' | false;
   /** Page transition type: 'slide' (default), 'fade', or 'none' to disable */
   transition?: TransitionType | 'none';
   /** Custom transition duration in ms. Defaults: slide=500ms, fade=300ms */
   transitionDuration?: number;
+  /** Opt-in to View Transition API for shared element morphing (Chrome 111+). Graceful fallback. */
+  viewTransition?: boolean;
   /** Guard called before navigating TO this route. Return false to cancel. */
   beforeEnter?: NavigationGuard;
   /** Guard called before navigating AWAY from this route. Return false to cancel. */
@@ -140,6 +144,13 @@ export interface MicroRouterConfig {
     /** Max entries before FIFO eviction. Default: 50 */
     maxEntries?: number;
   };
+  /** Swipe-back gesture navigation config (opt-in) */
+  gesture?: {
+    enabled?: boolean;
+    edgeWidth?: number;
+    threshold?: number;
+    velocityThreshold?: number;
+  };
   /** Navigation guard hooks — beforeEach runs before every navigation, afterEach runs after */
   guards?: {
     beforeEach?: NavigationGuard[];
@@ -231,6 +242,8 @@ export interface MicroRouterStore {
   registerRoutes: (routes: MicroRoute[]) => void;
   updateRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
+  /** Manually preload an async route component by segment name */
+  preloadRoute: (segment: string) => Promise<void>;
 
   // ── Dialogs ──────────────────────────────────────────────────────────────
   /** Path of the topmost open dialog, or "" if none */

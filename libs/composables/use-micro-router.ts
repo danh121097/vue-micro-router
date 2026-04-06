@@ -18,11 +18,12 @@ import {
   watch
 } from 'vue';
 
-import { MICRO_ROUTER_KEY } from '../core/constants';
+import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY, createRouterKey } from '../core/constants';
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
 import type { RouteMap, TypedPush } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './use-control-manager';
+import { setupDevtoolsPlugin, emitDevtoolsEvent, refreshDevtoolsInspector } from '../devtools/devtools-plugin';
 import { serializeState, restoreState } from './use-state-serializer';
 import { useDialogManager } from './use-dialog-manager';
 import { useNavigation } from './use-navigation';
@@ -70,6 +71,7 @@ export function useGlobalMicroRouter(
     registerRoutes: navigation.registerRoutes,
     updateRouteAttrs: navigation.updateRouteAttrs,
     getRouteAttrs: navigation.getRouteAttrs,
+    preloadRoute: navigation.preloadRoute,
 
     // History (conditional — only if enabled)
     ...(navigation.history ? {
@@ -120,6 +122,9 @@ export function useGlobalMicroRouter(
     if (page === defaultPage && oldPage !== defaultPage) {
       tracker.trackGuiEnter(active);
     }
+    // Devtools: emit navigation event and refresh inspector
+    emitDevtoolsEvent('navigate', { from: oldPage, to: page });
+    refreshDevtoolsInspector();
   });
 
   // Lifecycle
@@ -131,6 +136,8 @@ export function useGlobalMicroRouter(
       undefined,
       navigation.activePath.value
     );
+    // Initialize devtools (no-ops in production or when @vue/devtools-api not installed)
+    setupDevtoolsPlugin(store);
   });
 
   onBeforeUnmount(() => {
@@ -141,6 +148,11 @@ export function useGlobalMicroRouter(
   });
 
   provide(MICRO_ROUTER_KEY, store);
+  // Also provide as root — first MicroRouterView in the tree is the root
+  const existingRoot = inject(MICRO_ROUTER_ROOT_KEY, null);
+  if (!existingRoot) {
+    provide(MICRO_ROUTER_ROOT_KEY, store);
+  }
   return store;
 }
 
@@ -167,14 +179,22 @@ export type TypedMicroRouterStore<T extends RouteMap> = Omit<MicroRouterStore, '
  * router.push('typo');                     // TS error
  * ```
  */
-export function useMicroRouter(): MicroRouterStore;
-export function useMicroRouter<T extends RouteMap>(): TypedMicroRouterStore<T>;
-export function useMicroRouter(): MicroRouterStore {
-  const store = inject(MICRO_ROUTER_KEY);
+export interface UseMicroRouterOptions {
+  /** If true, injects the root (outermost) router instead of the nearest parent */
+  root?: boolean;
+}
+
+export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore;
+export function useMicroRouter<T extends RouteMap>(options?: UseMicroRouterOptions): TypedMicroRouterStore<T>;
+export function useMicroRouter(options?: UseMicroRouterOptions): MicroRouterStore {
+  const key = options?.root ? MICRO_ROUTER_ROOT_KEY : MICRO_ROUTER_KEY;
+  const store = inject(key);
   if (!store) {
     throw new Error(
-      '[vue-micro-router] useMicroRouter() must be called inside <MicroRouterView>. ' +
-        'Did you forget to wrap your app with <MicroRouterView>?'
+      options?.root
+        ? '[vue-micro-router] useMicroRouter({ root: true }) failed — no root <MicroRouterView> found.'
+        : '[vue-micro-router] useMicroRouter() must be called inside <MicroRouterView>. ' +
+          'Did you forget to wrap your app with <MicroRouterView>?'
     );
   }
   return store as any;

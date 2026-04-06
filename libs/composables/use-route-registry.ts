@@ -11,7 +11,7 @@ import {
 } from 'vue';
 
 import type { MicroRoute } from '../core/types';
-import { isAsyncLoader, safeMarkRaw } from '../utils/path-utils';
+import { isAsyncLoader, safeMarkRaw, warmLoaderCache } from '../utils/path-utils';
 
 export interface RouteRegistry {
   /** Registered route definitions keyed by segment name */
@@ -20,6 +20,10 @@ export interface RouteRegistry {
   asyncLoaders: Map<string, AsyncComponentLoader>;
   registerRoute: (route: MicroRoute) => void;
   registerRoutes: (routes: MicroRoute[]) => void;
+  /** Manually preload an async route's component module */
+  preloadRoute: (segment: string) => Promise<void>;
+  /** Preload all routes marked with preload: 'adjacent' that are reachable from current segments */
+  preloadAdjacent: (currentSegments: string[]) => void;
 }
 
 export function createRouteRegistry(): RouteRegistry {
@@ -42,11 +46,32 @@ export function createRouteRegistry(): RouteRegistry {
       ...route,
       component: safeMarkRaw(component)
     });
+
+    // Eager preload: immediately warm the async loader cache on registration
+    if (route.preload === 'eager' && asyncLoaders.has(route.path)) {
+      warmLoaderCache(asyncLoaders.get(route.path)!);
+    }
   }
 
   function registerRoutes(routeList: MicroRoute[]) {
     routeList.forEach(registerRoute);
   }
 
-  return { routes, asyncLoaders, registerRoute, registerRoutes };
+  /** Preload a single route's async component by segment name */
+  async function preloadRoute(segment: string): Promise<void> {
+    const loader = asyncLoaders.get(segment);
+    if (loader) await warmLoaderCache(loader);
+  }
+
+  /** Preload all 'adjacent' routes not currently in the active segments */
+  function preloadAdjacent(currentSegments: string[]): void {
+    for (const [segment, route] of routes.entries()) {
+      if (route.preload === 'adjacent' && !currentSegments.includes(segment)) {
+        const loader = asyncLoaders.get(segment);
+        if (loader) warmLoaderCache(loader);
+      }
+    }
+  }
+
+  return { routes, asyncLoaders, registerRoute, registerRoutes, preloadRoute, preloadAdjacent };
 }

@@ -61,6 +61,8 @@ export interface NavigationState {
   registerRoutes: (routes: MicroRoute[]) => void;
   updateRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
+  /** Manually preload an async route component */
+  preloadRoute: (segment: string) => Promise<void>;
   /** Navigation history (only populated when config.history.enabled) */
   history?: NavigationHistory;
   cleanup: () => void;
@@ -179,15 +181,36 @@ export function useNavigation(
         .map((loader) => warmLoaderCache(loader))
     );
 
-    const prevPath = state.activePath;
-    if (prevPath !== normalized) {
-      tracker?.trackPageLeave?.(prevPath, prevPath, normalized);
+    // Check if target route opts into View Transition API
+    const targetSegment = targetSegments.at(-1);
+    const targetRoute = targetSegment ? registry.routes.get(targetSegment) : undefined;
+    const useViewTransition = targetRoute?.viewTransition &&
+      typeof document !== 'undefined' &&
+      'startViewTransition' in document;
+
+    const doNavigate = () => {
+      const prevPath = state.activePath;
+      if (prevPath !== normalized) {
+        tracker?.trackPageLeave?.(prevPath, prevPath, normalized);
+      }
+      state.fromPath = prevPath;
+      state.toPath = normalized;
+      state.activePath = normalized;
+      if (props) updateRouteProps(normalized, props);
+      tracker?.trackPageEnter?.(normalized, prevPath, normalized);
+    };
+
+    if (useViewTransition) {
+      try {
+        const transition = (document as any).startViewTransition(doNavigate);
+        await transition.finished;
+      } catch {
+        // View Transition API can reject — fallback to direct navigation
+        doNavigate();
+      }
+    } else {
+      doNavigate();
     }
-    state.fromPath = prevPath;
-    state.toPath = normalized;
-    state.activePath = normalized;
-    if (props) updateRouteProps(normalized, props);
-    tracker?.trackPageEnter?.(normalized, prevPath, normalized);
   }
 
   function updateRouteProps(path: string, props: Record<string, unknown>) {
@@ -311,6 +334,9 @@ export function useNavigation(
       // Fire afterEach hooks (non-blocking)
       executeAfterHooks(toPath, fromPath, guardConfig.afterEach);
 
+      // Adjacent preloading — warm async routes reachable from current path
+      registry.preloadAdjacent(parsePathSegments(state.activePath));
+
       timers.schedule(() => {
         isNavigating = false;
       }, stepDelay);
@@ -368,6 +394,7 @@ export function useNavigation(
     registerRoutes: registry.registerRoutes,
     updateRouteAttrs,
     getRouteAttrs,
+    preloadRoute: registry.preloadRoute,
     history: navHistory,
     cleanup: timers.cleanup
   };
