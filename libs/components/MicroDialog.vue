@@ -71,7 +71,7 @@ function primeMobileKeyboard() {
   setTimeout(() => input.remove(), 50);
 }
 
-// Open/close the native dialog based on activated state
+// Open native dialog when activated
 watch(
   () => props.dialog.activated,
   (activated) => {
@@ -80,12 +80,22 @@ watch(
       if (activated && !dialogRef.value.open) {
         dialogRef.value.showModal();
         primeMobileKeyboard();
-      } else if (!activated && dialogRef.value.open) {
-        dialogRef.value.close();
       }
+      // Don't call close() here — wait for closing animation to finish
     });
   },
   { immediate: true },
+);
+
+// Close native dialog after closing animation completes
+// Dialog manager sets closing=true → waits transitionDuration → sets closing=false
+watch(
+  () => props.dialog.closing,
+  (closing) => {
+    if (!closing && !props.dialog.activated && dialogRef.value?.open) {
+      dialogRef.value.close();
+    }
+  },
 );
 
 onMounted(() => {
