@@ -288,6 +288,72 @@ router.push('unknown');                  // ❌ TS Error: unknown route
 
 **Untyped:** `useMicroRouter()` without Register returns `MicroRouterStore` with untyped methods.
 
+#### Typed Props (Per-Route/Dialog/Control Attrs)
+
+Opt-in per-component — export `interface Attrs` to get typed `push()` / `openDialog()` / `toggleControl()` props.
+
+**Step 1:** In your component, export `interface Attrs`:
+
+```vue
+<!-- ProfilePage.vue -->
+<script setup lang="ts">
+import { useMicroState } from 'vue-micro-router';
+
+export interface Attrs {
+  userId: number;
+  username: string;
+  meta?: { title: string };  // optional fields OK
+}
+
+// Required fields need defaults (prevents undefined on remount)
+const { userId, username, meta } = useMicroState<Attrs>({
+  userId: 0,
+  username: 'Guest',
+});
+// userId.value → number (never undefined)
+// meta.value?.title → string | undefined (ref exists, value may be undefined)
+</script>
+```
+
+```vue
+<!-- ConfirmDialog.vue -->
+<script setup lang="ts">
+export interface Attrs {
+  title?: string;
+  message?: string;
+  onConfirm?: () => void;
+}
+const { title, message, onConfirm } = useMicroState<Attrs>({
+  title: 'Confirm',
+  message: 'Are you sure?',
+});
+</script>
+```
+
+**Step 2:** Run code generation:
+
+```bash
+bun run gen:types
+```
+
+This scans plugin files, finds components with `export interface Attrs`, and generates `vue-micro-router.d.ts` with all type mappings.
+
+**Step 3:** Typed everywhere — no extra work:
+
+```ts
+push('profile', { userId: 42, username: 'Danh' });  // ✅ typed, autocomplete
+push('profile');                                      // ❌ TS error: missing required props
+push('home');                                         // ✅ OK (no Attrs defined → optional)
+openDialog('confirm', { title: 'Sure?' });            // ✅ typed
+stepWisePush('profile', { userId: 1, username: 'A' }); // ✅ typed
+```
+
+**Rules:**
+- Required fields in `Attrs` → must pass in `push()` / `openDialog()`
+- Optional fields (`?`) → can omit
+- Routes without `export interface Attrs` → `push()` accepts any `Record<string, unknown>`
+- Re-run `bun run gen:types` after adding/changing `Attrs` interfaces
+
 ### State Serialization
 
 Save and restore full router state for session persistence:
