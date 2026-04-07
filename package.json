@@ -1,6 +1,6 @@
 {
   "name": "vue-micro-router",
-  "version": "1.0.20",
+  "version": "1.0.21",
   "type": "module",
   "description": "Mobile-app-style navigation for Vue 3 — animated page stacks, modal dialogs, HUD controls. No URL routing.",
   "author": {
