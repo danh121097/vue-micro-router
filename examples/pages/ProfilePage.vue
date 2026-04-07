@@ -35,7 +35,6 @@ useRouteLifecycle({
 
     <div class="badges">
       <span class="badge blue">preload: adjacent</span>
-      <span class="badge purple">viewTransition: true</span>
       <span class="badge green">beforeEnter guard</span>
     </div>
 
@@ -72,14 +71,6 @@ store.toggleControl('main_hud', true); // OK
       >
     </div>
 
-    <div class="info">
-      <h3>View Transition API</h3>
-      <p>
-        <code>viewTransition: true</code> opts in to the browser's View
-        Transition API for shared element morphing. Falls back gracefully on
-        unsupported browsers.
-      </p>
-    </div>
   </div>
 </template>
 
@@ -96,10 +87,8 @@ store.toggleControl('main_hud', true); // OK
 }
 h1 {
   font-size: 2rem;
-  view-transition-name: page-title;
 }
 .profile-card {
-  view-transition-name: profile-card;
 }
 .badges {
   display: flex;

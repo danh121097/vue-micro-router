@@ -48,8 +48,6 @@ export interface MicroRoute {
   transition?: TransitionType | 'none';
   /** Custom transition duration in ms. Defaults: slide=500ms, fade=300ms */
   transitionDuration?: number;
-  /** Opt-in to View Transition API for shared element morphing (Chrome 111+). Graceful fallback. */
-  viewTransition?: boolean;
   /** Guard called before navigating TO this route. Return false to cancel. */
   beforeEnter?: NavigationGuard;
   /** Guard called before navigating AWAY from this route. Return false to cancel. */

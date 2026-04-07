@@ -103,8 +103,7 @@ function showConfirm() {
       <ul>
         <li><code>push('settings')</code> — fade transition (300ms)</li>
         <li>
-          <code>push('profile', props)</code> — viewTransition +
-          preload:adjacent
+          <code>push('profile', props)</code> — preload:adjacent
         </li>
         <li>
           <code>push('admin')</code> — blocked by authGuard unless authenticated

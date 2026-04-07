@@ -358,21 +358,6 @@ const rootRouter = useMicroRouter({ root: true });
 const localRouter = useMicroRouter(); // nearest parent
 ```
 
-### Shared Element Transitions
-
-Opt-in View Transition API (Chrome 111+) for shared element morphing:
-
-```ts
-defineFeaturePlugin({
-  routes: [
-    { path: 'list', component: ListPage },
-    { path: 'detail', component: DetailPage, viewTransition: true },
-  ],
-});
-```
-
-Users set `view-transition-name` on their own elements via CSS. Graceful fallback in unsupported browsers.
-
 ### Step-Wise Navigation
 
 Animate through intermediate pages one-by-one:

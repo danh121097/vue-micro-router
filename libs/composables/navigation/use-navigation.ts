@@ -177,37 +177,15 @@ export function useNavigation(
         .map((loader) => warmLoaderCache(loader))
     );
 
-    // Check if target route opts into View Transition API
-    const targetSegment = targetSegments.at(-1);
-    const targetRoute = targetSegment ? registry.routes.get(targetSegment) : undefined;
-    const useViewTransition = targetRoute?.viewTransition &&
-      typeof document !== 'undefined' &&
-      'startViewTransition' in document;
-
-    const doNavigate = () => {
-      const prevPath = state.activePath;
-      if (prevPath !== normalized) {
-        tracker?.trackPageLeave?.(prevPath, prevPath, normalized);
-      }
-      state.fromPath = prevPath;
-      state.toPath = normalized;
-      state.activePath = normalized;
-      if (props) updateRouteProps(normalized, props);
-      tracker?.trackPageEnter?.(normalized, prevPath, normalized);
-    };
-
-    if (useViewTransition) {
-      try {
-        const transition = (document as any).startViewTransition(doNavigate);
-        // Catch both ready and finished — either can reject on abort
-        await transition.ready.catch(() => {});
-        await transition.finished.catch(() => {});
-      } catch {
-        doNavigate();
-      }
-    } else {
-      doNavigate();
+    const prevPath = state.activePath;
+    if (prevPath !== normalized) {
+      tracker?.trackPageLeave?.(prevPath, prevPath, normalized);
     }
+    state.fromPath = prevPath;
+    state.toPath = normalized;
+    state.activePath = normalized;
+    if (props) updateRouteProps(normalized, props);
+    tracker?.trackPageEnter?.(normalized, prevPath, normalized);
   }
 
   function updateRouteProps(path: string, props: Record<string, unknown>) {

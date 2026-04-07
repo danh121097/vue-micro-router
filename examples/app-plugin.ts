@@ -19,12 +19,7 @@ export const appPlugin = defineFeaturePlugin({
   routes: [
     { path: 'home', component: HomePage },
     { path: 'settings', component: SettingsPage },
-    {
-      path: 'profile',
-      component: ProfilePage,
-      preload: 'adjacent' as const,
-      viewTransition: true
-    },
+    { path: 'profile', component: ProfilePage, preload: 'adjacent' as const },
     { path: 'admin', component: AdminPage },
     { path: 'nested', component: NestedDemoPage, preload: 'eager' as const }
   ],
