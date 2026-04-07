@@ -43,9 +43,13 @@
   },
   "files": [
     "dist",
+    "bin",
     "README.md",
     "LICENSE"
   ],
+  "bin": {
+    "vue-micro-router-gen": "./bin/gen-attrs-types.mjs"
+  },
   "sideEffects": [
     "*.css"
   ],
