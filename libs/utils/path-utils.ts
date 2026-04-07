@@ -15,9 +15,10 @@ export function buildPathFromSegments(segments: string[]): string {
   return `/${segments.join('/')}`;
 }
 
-/** Get last segment from path: "/home/missions/detail" → "detail" */
+/** Get last segment from path: "/home/missions/detail" → "detail" (zero-allocation) */
 export function getLastSegment(path: string): string {
-  return path.split('/').filter(Boolean).at(-1) ?? '';
+  const idx = path.lastIndexOf('/');
+  return idx === -1 ? path : path.substring(idx + 1);
 }
 
 /** Safely mark a Vue component as raw to prevent reactivity */

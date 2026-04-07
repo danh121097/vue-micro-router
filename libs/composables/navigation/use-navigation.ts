@@ -143,10 +143,10 @@ export function useNavigation(
     const targetSegments = segments.slice(0, -safeSteps);
     const targetPath = buildPathFromSegments(targetSegments);
 
-    // Clear attrs on removed segments
-    segments.slice(-safeSteps).forEach((segment) => {
-      state.routeAttrs.delete(segment);
-    });
+    // Clear attrs on removed segments (iterate by index to avoid intermediate array)
+    for (let i = segments.length - safeSteps; i < segments.length; i++) {
+      state.routeAttrs.delete(segments[i]!);
+    }
 
     // Apply props to target segment and force remount when props are passed
     const newTopSegment = targetSegments.at(-1);
@@ -240,9 +240,9 @@ export function useNavigation(
           // Multi-step: collapse intermediates first, wait for DOM update, then animate final step
           const intermediateSegments = currentSegments.slice(0, segments.length + 1);
           const intermediatePath = buildPathFromSegments(intermediateSegments);
-          currentSegments.slice(segments.length + 1).forEach((seg) => {
-            state.routeAttrs.delete(seg);
-          });
+          for (let i = segments.length + 1; i < currentSegments.length; i++) {
+            state.routeAttrs.delete(currentSegments[i]!);
+          }
           state.activePath = intermediatePath;
           await nextTick(); // let Vue remove intermediate pages from DOM
           navigateBack(1, props);
@@ -277,9 +277,9 @@ export function useNavigation(
         const intermediateSegments = currentSegments.slice(0, existingIndex + 2);
         const intermediatePath = buildPathFromSegments(intermediateSegments);
         // Clear attrs on pages we're skipping over (not the one that will animate out)
-        currentSegments.slice(existingIndex + 2).forEach((seg) => {
-          state.routeAttrs.delete(seg);
-        });
+        for (let i = existingIndex + 2; i < currentSegments.length; i++) {
+          state.routeAttrs.delete(currentSegments[i]!);
+        }
         state.activePath = intermediatePath;
         await nextTick(); // let Vue remove intermediate pages from DOM
         navigateBack(1, props);

@@ -200,7 +200,7 @@ export function useGlobalMicroRouter(
       navigation.activePath.value
     );
     if (audio) {
-      addEventListener('visibilitychange', audio.handleVisibilityChange);
+      document.addEventListener('visibilitychange', audio.handleVisibilityChange);
     }
     // Initialize devtools (no-ops in production or when @vue/devtools-api not installed)
     setupDevtoolsPlugin(store);
@@ -212,7 +212,7 @@ export function useGlobalMicroRouter(
     dialogs.cleanup();
     controls.cleanup();
     if (audio) {
-      removeEventListener('visibilitychange', audio.handleVisibilityChange);
+      document.removeEventListener('visibilitychange', audio.handleVisibilityChange);
       audio.cleanup();
     }
   });

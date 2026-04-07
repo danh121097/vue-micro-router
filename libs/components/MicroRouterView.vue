@@ -38,8 +38,8 @@ const pageContainerRef = ref<HTMLElement | null>(null);
 
 const hasSharedSegments = computed(() => {
   const fromSegments = fromPath.value.split('/').filter(Boolean);
-  const toSegments = toPath.value.split('/').filter(Boolean);
-  return fromSegments.some((s) => toSegments.includes(s));
+  const toSegments = new Set(toPath.value.split('/').filter(Boolean));
+  return fromSegments.some((s) => toSegments.has(s));
 });
 const showGUI = computed(() => resolveControls.value.length > 0);
 

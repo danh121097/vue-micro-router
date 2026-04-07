@@ -10,7 +10,7 @@ import { computed, ref, watch, type Ref } from 'vue';
 import type { AudioAdapter } from '../audio/audio-adapter-types';
 import { HowlerAdapter } from '../audio/howler-adapter';
 import type { MicroRoute } from '../core/types';
-import { delay } from '../utils/timer-manager';
+import { getLastSegment } from '../utils/path-utils';
 
 export interface AudioManagerConfig {
   /** Volume ref (0-100). Defaults to 100. */
@@ -55,7 +55,6 @@ export function useAudioManager(
       previousSoundSrc = soundSrc.value;
       soundSrc.value = src;
       adapter.stop();
-      await delay(50);
 
       await adapter.play(src, { loop, volume: volume.value });
     } catch (error) {
@@ -92,7 +91,7 @@ export function useAudioManager(
   ) {
     if (!routes) return;
     try {
-      const routeKey = route.split('/').pop() || 'home';
+      const routeKey = getLastSegment(route) || 'home';
       const registered = routes.get(routeKey);
       const newSrc = registered?.bgm || defaultBgm;
 
