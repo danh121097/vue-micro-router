@@ -7,7 +7,7 @@
  *
  * flush: 'post' batches the write-back watcher after the render cycle ends.
  */
-import { inject, reactive, toRef, watch, type Ref } from 'vue';
+import { inject, reactive, toRef, toRefs, watch, type Ref } from 'vue';
 
 import { MICRO_ATTRS_READ_KEY, MICRO_ATTRS_WRITE_KEY } from '../core/constants';
 
@@ -74,24 +74,20 @@ export function useMicroState<T extends object>(defaults?: T): StateRefs<T> {
     );
   }
 
-  // Proxy creates refs lazily — handles optional keys not in defaults/attrs.
-  // toRef(state, key) returns a valid Ref even if key doesn't exist yet.
-  const refCache = new Map<string, Ref>();
-  const getRef = (key: string) => {
-    if (!refCache.has(key)) {
-      refCache.set(key, toRef(state as Record<string, unknown>, key));
-    }
-    return refCache.get(key)!;
-  };
+  // toRefs for existing keys + toRef for any key accessed via destructure.
+  // toRefs only creates refs for keys present on the reactive object.
+  // We supplement with toRef for optional keys not in initial/attrs.
+  const refs = toRefs(state) as Record<string, Ref>;
 
-  return new Proxy({}, {
-    get: (_, key) => typeof key === 'string' ? getRef(key) : undefined,
-    has: () => true,
-    ownKeys: () => Reflect.ownKeys(state),
-    getOwnPropertyDescriptor: (_, key) => ({
-      configurable: true,
-      enumerable: true,
-      value: typeof key === 'string' ? getRef(key) : undefined,
-    }),
+  // Return a Proxy that falls back to toRef for missing keys (optional fields).
+  // Unlike a full Proxy, this delegates all standard operations to the refs object
+  // so Vue template internals (Symbol checks, __v_isRef, etc.) work normally.
+  return new Proxy(refs, {
+    get(target, key, receiver) {
+      if (typeof key === 'string' && !(key in target)) {
+        target[key] = toRef(state as Record<string, unknown>, key);
+      }
+      return Reflect.get(target, key, receiver);
+    },
   }) as StateRefs<T>;
 }

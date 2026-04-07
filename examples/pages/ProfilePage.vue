@@ -15,7 +15,10 @@ export interface Attrs {
 }
 
 const router = useMicroRouter();
-const { userId, username, meta } = useMicroState<Attrs>();
+const { userId, username, meta } = useMicroState<Attrs>({
+  userId: 0,
+  username: 'Guest'
+});
 
 useRouteLifecycle({
   onRouteEnter: () =>
@@ -93,6 +96,10 @@ store.toggleControl('main_hud', true); // OK
 }
 h1 {
   font-size: 2rem;
+  view-transition-name: page-title;
+}
+.profile-card {
+  view-transition-name: profile-card;
 }
 .badges {
   display: flex;

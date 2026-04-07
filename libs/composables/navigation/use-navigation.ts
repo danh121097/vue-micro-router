@@ -199,9 +199,10 @@ export function useNavigation(
     if (useViewTransition) {
       try {
         const transition = (document as any).startViewTransition(doNavigate);
-        await transition.finished;
+        // Catch both ready and finished — either can reject on abort
+        await transition.ready.catch(() => {});
+        await transition.finished.catch(() => {});
       } catch {
-        // View Transition API can reject — fallback to direct navigation
         doNavigate();
       }
     } else {
