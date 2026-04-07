@@ -13,14 +13,13 @@ type HowlInstance = InstanceType<HowlCtor>;
 
 export class HowlerAdapter implements AudioAdapter {
   private sound: HowlInstance | null = null;
-  private howlCtorPromise: Promise<HowlCtor> | null = null;
+  private HowlCtor: HowlCtor | null = null;
 
-  /** Lazy-load Howler.js — only imported when first sound is played */
-  private async getHowlCtor(): Promise<HowlCtor> {
-    if (!this.howlCtorPromise) {
-      this.howlCtorPromise = import('howler').then((mod) => mod.Howl);
-    }
-    return this.howlCtorPromise;
+  constructor() {
+    // Preload Howler.js eagerly so play() is synchronous (no async gap = no autoplay block)
+    import('howler')
+      .then((mod) => { this.HowlCtor = mod.Howl; })
+      .catch(() => { /* howler not installed — play() will error */ });
   }
 
   async play(
@@ -28,14 +27,32 @@ export class HowlerAdapter implements AudioAdapter {
     options: { loop?: boolean; volume?: number } = {}
   ): Promise<void> {
     this.stop();
-    const Howl = await this.getHowlCtor();
-    this.sound = new Howl({
+    // Wait for preload if not ready yet (first call only)
+    if (!this.HowlCtor) {
+      const mod = await import('howler');
+      this.HowlCtor = mod.Howl;
+    }
+    this.sound = new this.HowlCtor({
       src: [src],
       autoplay: true,
       loop: options.loop ?? false,
-      volume: 0
+      volume: 0,
     });
-    // Fade in to prevent audible pop/click (autoplay handles initial play)
+    this.sound.play();
+    this.sound.fade(0, options.volume ?? 1, 200);
+  }
+
+  /** Fully synchronous play — uses preloaded HowlCtor. No-op if not preloaded yet. */
+  playSync(src: string, options: { loop?: boolean; volume?: number } = {}): void {
+    if (!this.HowlCtor) return; // not preloaded yet — first gesture missed
+    this.stop();
+    this.sound = new this.HowlCtor({
+      src: [src],
+      autoplay: true,
+      loop: options.loop ?? false,
+      volume: 0,
+    });
+    this.sound.play();
     this.sound.fade(0, options.volume ?? 1, 200);
   }
 

@@ -7,6 +7,8 @@
 export interface AudioAdapter {
   /** Play a sound from the given source URL */
   play(src: string, options: { loop?: boolean; volume?: number }): Promise<void>;
+  /** Synchronous play — must work without await for user gesture context. Optional — falls back to play(). */
+  playSync?(src: string, options: { loop?: boolean; volume?: number }): void;
   /** Stop and unload the current sound */
   stop(): void;
   /** Pause playback (preserves position) */

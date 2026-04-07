@@ -1,6 +1,6 @@
 {
   "name": "vue-micro-router",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "type": "module",
   "description": "Mobile-app-style navigation for Vue 3 — animated page stacks, modal dialogs, HUD controls. No URL routing.",
   "author": {
@@ -55,7 +55,6 @@
   ],
   "peerDependencies": {
     "vue": "^3.4.0",
-    "howler": "^2.2.0",
     "@vue/devtools-api": "^6.0.0 || ^7.0.0"
   },
   "peerDependenciesMeta": {
@@ -70,6 +69,7 @@
     "@eslint/js": "^10.0.1",
     "@types/bun": "^1.3.11",
     "@types/howler": "^2.2.12",
+    "howler": "^2.2.4",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vue/test-utils": "^2.4.6",
     "ajv": "^8.18.0",

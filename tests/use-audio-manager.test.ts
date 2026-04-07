@@ -15,8 +15,7 @@ describe('useAudioManager', () => {
 
   test('initializes with config', () => {
     const volumeRef = ref(50);
-    const urlResolver = (name: string) => `/audio/${name}.mp3`;
-    const am = useAudioManager({ volumeRef, urlResolver });
+    const am = useAudioManager({ volumeRef, defaultBgm: '/audio/bgm.mp3' });
     expect(am).toBeDefined();
   });
 
@@ -66,11 +65,9 @@ describe('useAudioManager', () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  test('urlResolver is used when provided', () => {
-    const resolver = mock((name: string) => `/cdn/${name}.ogg`);
-    const am = useAudioManager({ urlResolver: resolver });
+  test('defaultBgm config is accepted', () => {
+    const am = useAudioManager({ defaultBgm: '/audio/bgm.mp3' });
     expect(am).toBeDefined();
-    // resolver is called inside playSound — tested via integration
   });
 
   test('cleanup after playSound attempt does not throw', async () => {

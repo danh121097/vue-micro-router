@@ -160,10 +160,8 @@ export interface MicroRouterConfig {
   tracker?: PageTrackerHooks;
   /** Reactive volume ref (0-100) for audio manager. Enables built-in BGM when provided. */
   volumeRef?: Ref<number>;
-  /** Default BGM track name — used as initial track and fallback when route has no bgm field */
+  /** Default BGM audio path — used as initial track and fallback when route has no bgm field. Example: '/audios/default.mp3' */
   defaultBgm?: string;
-  /** Resolve audio name to URL. Defaults to identity. Example: (name) => `/audios/${name}.mp3` */
-  audioUrlResolver?: (name: string) => string;
 }
 
 // ── Serialized State ─────────────────────────────────────────────────────────

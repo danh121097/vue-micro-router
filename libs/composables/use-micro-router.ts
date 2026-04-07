@@ -81,7 +81,6 @@ export function useGlobalMicroRouter(
     ? useAudioManager({
         volumeRef: config.volumeRef,
         defaultBgm: config.defaultBgm,
-        urlResolver: config.audioUrlResolver,
       })
     : null;
 
@@ -94,9 +93,19 @@ export function useGlobalMicroRouter(
     fromPage: navigation.fromPage,
     toPage: navigation.toPage,
     resolveRoutes: navigation.resolveRoutes,
-    push: navigation.push,
-    stepWisePush: navigation.stepWisePush,
-    stepWiseBack: navigation.stepWiseBack,
+    push: async (destination, props?) => {
+      await navigation.push(destination, props);
+      // Sync BGM update in user gesture context (critical for autoplay policy)
+      if (audio) void audio.updateBackgroundMusic(navigation.activePath.value, navigation.routes);
+    },
+    stepWisePush: async (targetPath, props?) => {
+      await navigation.stepWisePush(targetPath, props);
+      if (audio) void audio.updateBackgroundMusic(navigation.activePath.value, navigation.routes);
+    },
+    stepWiseBack: async (steps) => {
+      await navigation.stepWiseBack(steps);
+      if (audio) void audio.updateBackgroundMusic(navigation.activePath.value, navigation.routes);
+    },
     registerRoute: navigation.registerRoute,
     registerRoutes: navigation.registerRoutes,
     updateRouteAttrs: navigation.updateRouteAttrs,
@@ -170,28 +179,20 @@ export function useGlobalMicroRouter(
     }
   });
 
-  // Cross-concern: navigation → audio (BGM switches on path change)
-  if (audio) {
-    let audioStarted = false;
-
-    watch(navigation.activePath, (path) => {
-      void audio.updateBackgroundMusic(path, navigation.routes);
-    });
-
-    // Browser autoplay policy blocks audio before user gesture.
-    // Start BGM on first user interaction, then remove listener.
-    const startAudioOnInteraction = () => {
-      if (audioStarted) return;
-      audioStarted = true;
-      void audio.updateBackgroundMusic(
-        navigation.activePath.value,
-        navigation.routes,
-      );
-      document.removeEventListener('click', startAudioOnInteraction);
-      document.removeEventListener('touchstart', startAudioOnInteraction);
+  // Audio: BGM updated inline in push/stepWisePush/stepWiseBack (user gesture context).
+  // For initial default BGM: play synchronously on first user gesture (no async allowed).
+  if (audio && config.defaultBgm) {
+    const bgmSrc = config.defaultBgm;
+    const playDefaultBgm = () => {
+      if (!audio.isStarted()) {
+        // Must be fully synchronous — any async breaks user gesture context
+        audio.playSoundSync(bgmSrc, true);
+      }
+      document.removeEventListener('click', playDefaultBgm);
+      document.removeEventListener('touchstart', playDefaultBgm);
     };
-    document.addEventListener('click', startAudioOnInteraction, { once: true });
-    document.addEventListener('touchstart', startAudioOnInteraction, { once: true });
+    document.addEventListener('click', playDefaultBgm);
+    document.addEventListener('touchstart', playDefaultBgm);
   }
 
   // Lifecycle
@@ -203,7 +204,9 @@ export function useGlobalMicroRouter(
       undefined,
       navigation.activePath.value
     );
-    if (audio) addEventListener('visibilitychange', audio.handleVisibilityChange);
+    if (audio) {
+      addEventListener('visibilitychange', audio.handleVisibilityChange);
+    }
     // Initialize devtools (no-ops in production or when @vue/devtools-api not installed)
     setupDevtoolsPlugin(store);
   });

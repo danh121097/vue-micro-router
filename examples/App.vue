@@ -2,8 +2,9 @@
 /**
  * Root app — showcases all vue-micro-router features including type-safe plugin inference.
  */
+import { ref } from 'vue';
 import { MicroRouterView } from '../libs/index';
-import type { NavigationGuard } from '../libs/index';
+import type { MicroRouterConfig, NavigationGuard } from '../libs/index';
 import '../libs/styles/index.css';
 
 import { isAuthenticated } from './auth-state';
@@ -21,22 +22,24 @@ const authGuard: NavigationGuard = (to, _from) => {
 const analyticsHook = (to: string, from: string) => {
   console.log(`[Analytics] ${from} → ${to}`);
 };
+
+const bgmVolume = ref(80);
+const config: MicroRouterConfig = {
+  defaultPath: 'home',
+  defaultControlName: 'main_hud',
+  history: { enabled: true, maxEntries: 50 },
+  gesture: { enabled: true, edgeWidth: 30, threshold: 0.3 },
+  guards: {
+    beforeEach: [authGuard],
+    afterEach: [analyticsHook]
+  },
+  volumeRef: bgmVolume,
+  defaultBgm: '/audios/default.mp3'
+};
 </script>
 
 <template>
-  <MicroRouterView
-    :config="{
-      defaultPath: 'home',
-      defaultControlName: 'main_hud',
-      history: { enabled: true, maxEntries: 50 },
-      gesture: { enabled: true, edgeWidth: 30, threshold: 0.3 },
-      guards: {
-        beforeEach: [authGuard],
-        afterEach: [analyticsHook]
-      }
-    }"
-    :plugins="[appPlugin]"
-  />
+  <MicroRouterView :config="config" :plugins="[appPlugin]" />
 </template>
 
 <style>
