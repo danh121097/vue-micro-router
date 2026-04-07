@@ -132,7 +132,7 @@ onMounted(() => {
       @cancel="handleCancel"
       @click="handleBackdropClick"
     >
-      <div class="micro-dialog__content" @click.stop>
+      <div class="micro-dialog__content" style="width: 100%" @click.stop>
         <slot />
         <component
           :is="dialog.component"
