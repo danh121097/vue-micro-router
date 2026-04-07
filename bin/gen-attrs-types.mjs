@@ -62,9 +62,9 @@ if (!scanDir) {
 }
 const SCAN_PATH = resolve(CWD, scanDir);
 
-// Auto-detect output — put in scan dir if it's src/app, else root
+// Always output to project root — avoids Vite HMR loop when inside src/
 if (!outputFile) {
-  outputFile = scanDir !== '.' ? `${scanDir}/vue-micro-router.d.ts` : 'vue-micro-router.d.ts';
+  outputFile = 'vue-micro-router.d.ts';
 }
 
 console.log(`Scan: ${scanDir}/`);
