@@ -171,10 +171,11 @@ export function useGlobalMicroRouter(
   });
 
   // Cross-concern: navigation → audio (BGM switches on path change)
+  // immediate: true → plays default BGM on mount (Howler queues if autoplay blocked)
   if (audio) {
     watch(navigation.activePath, (path) => {
       void audio.updateBackgroundMusic(path, navigation.routes);
-    });
+    }, { immediate: true });
   }
 
   // Lifecycle
