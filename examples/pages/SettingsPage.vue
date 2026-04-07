@@ -65,7 +65,9 @@ function showSerializedState() {
       >
         Save
       </button>
-      <button @click="stepWisePush('profile', { userId: 1, username: 'Danh' })">Step-wise → Profile</button>
+      <button @click="stepWisePush('profile', { userId: 1, username: 'Danh' })">
+        Step-wise → Profile
+      </button>
     </div>
 
     <div class="actions">
