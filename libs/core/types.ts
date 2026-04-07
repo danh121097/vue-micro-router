@@ -162,6 +162,8 @@ export interface MicroRouterConfig {
   volumeRef?: Ref<number>;
   /** Default BGM audio path — used as initial track and fallback when route has no bgm field. Example: '/audios/default.mp3' */
   defaultBgm?: string;
+  /** Set to true (in a user gesture handler) to start default BGM. Watched with flush:'sync' to preserve gesture context for autoplay policy. */
+  bgmStartRef?: Ref<boolean>;
 }
 
 // ── Serialized State ─────────────────────────────────────────────────────────

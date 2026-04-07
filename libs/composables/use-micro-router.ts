@@ -180,19 +180,14 @@ export function useGlobalMicroRouter(
   });
 
   // Audio: BGM updated inline in push/stepWisePush/stepWiseBack (user gesture context).
-  // For initial default BGM: play synchronously on first user gesture (no async allowed).
-  if (audio && config.defaultBgm) {
-    const bgmSrc = config.defaultBgm;
-    const playDefaultBgm = () => {
-      if (!audio.isStarted()) {
-        // Must be fully synchronous — any async breaks user gesture context
-        audio.playSoundSync(bgmSrc, true);
+  // For initial default BGM: watch bgmStartRef with flush:'sync' so playSound runs
+  // synchronously WITHIN the user gesture handler that sets bgmStartRef.value = true.
+  if (audio && config.defaultBgm && config.bgmStartRef) {
+    watch(config.bgmStartRef, (ready) => {
+      if (ready && !audio.isStarted()) {
+        audio.playSoundSync(config.defaultBgm!, true);
       }
-      document.removeEventListener('click', playDefaultBgm);
-      document.removeEventListener('touchstart', playDefaultBgm);
-    };
-    document.addEventListener('click', playDefaultBgm);
-    document.addEventListener('touchstart', playDefaultBgm);
+    }, { flush: 'sync' });
   }
 
   // Lifecycle
