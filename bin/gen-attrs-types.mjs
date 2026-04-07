@@ -2,67 +2,98 @@
 /**
  * Auto-generate vue-micro-router.d.ts with ALL type augmentations.
  *
- * Convention:
- * - Plugin files: any *plugin*.ts file
- * - Components: export `interface Attrs { ... }` for typed attrs
+ * Scans ALL .ts files in the project for `defineFeaturePlugin(` calls,
+ * then finds components with `export interface Attrs` for typed props.
  *
- * Usage: npx vue-micro-router-gen
- *        npx vue-micro-router-gen [output-file]
+ * Usage:
+ *   npx vue-micro-router-gen                    # scan cwd, output vue-micro-router.d.ts
+ *   npx vue-micro-router-gen -o types.d.ts      # custom output file
+ *   npx vue-micro-router-gen -d src/plugins     # scan specific directory
+ *   npx vue-micro-router-gen --help
  */
 import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
-import { resolve, relative, dirname, join } from 'path';
+import { resolve, relative, dirname, join, extname } from 'path';
 
 const CWD = process.cwd();
-const OUTPUT_FILE = process.argv[2] || 'vue-micro-router.d.ts';
 const MODULE_NAME = 'vue-micro-router';
 
-// ── Glob replacement (Node-compatible) ─────────────────────────────────────
+// ── Parse args ──────────────────────────────────────────────────────────────
 
-function walkDir(dir, patterns) {
+const args = process.argv.slice(2);
+let OUTPUT_FILE = 'vue-micro-router.d.ts';
+let SCAN_DIR = CWD;
+
+for (let i = 0; i < args.length; i++) {
+  if (args[i] === '-o' || args[i] === '--output') OUTPUT_FILE = args[++i];
+  else if (args[i] === '-d' || args[i] === '--dir') SCAN_DIR = resolve(CWD, args[++i]);
+  else if (args[i] === '--help' || args[i] === '-h') {
+    console.log(`
+vue-micro-router-gen — Auto-generate typed augmentations
+
+Usage: npx vue-micro-router-gen [options]
+
+Options:
+  -o, --output <file>   Output file (default: vue-micro-router.d.ts)
+  -d, --dir <dir>       Directory to scan (default: cwd)
+  -h, --help            Show this help
+
+How it works:
+  1. Scans all .ts files for \`defineFeaturePlugin(\` calls
+  2. Extracts routes/dialogs/controls from plugin definitions
+  3. Checks if component files export \`interface Attrs { ... }\`
+  4. Generates vue-micro-router.d.ts with Register + AttrsMap augmentations
+
+Convention:
+  - Components that want typed push() props: \`export interface Attrs { ... }\`
+  - Required fields = must pass in push(). Optional fields = can skip.
+`);
+    process.exit(0);
+  }
+}
+
+// ── Walk & scan ─────────────────────────────────────────────────────────────
+
+const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.nuxt', '.next', '.output']);
+
+function walkTs(dir) {
   const results = [];
   try {
     const entries = readdirSync(dir, { withFileTypes: true });
     for (const entry of entries) {
+      if (SKIP_DIRS.has(entry.name)) continue;
       const fullPath = join(dir, entry.name);
-      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
       if (entry.isDirectory()) {
-        results.push(...walkDir(fullPath, patterns));
-      } else if (entry.isFile()) {
-        const relPath = relative(CWD, fullPath);
-        if (patterns.some(p => matchPattern(relPath, p))) {
-          results.push(relPath);
-        }
+        results.push(...walkTs(fullPath));
+      } else if (entry.isFile() && extname(entry.name) === '.ts') {
+        results.push(fullPath);
       }
     }
-  } catch { /* skip inaccessible dirs */ }
+  } catch { /* skip inaccessible */ }
   return results;
 }
 
-function matchPattern(filePath, pattern) {
-  // Simple glob: *plugin*.ts matches files containing "plugin" ending with .ts
-  const regex = pattern
-    .replace(/\*\*\//g, '(.+/)?')
-    .replace(/\*/g, '[^/]*')
-    .replace(/\./g, '\\.');
-  return new RegExp(`^${regex}$`).test(filePath);
-}
-
-function findFiles(patterns) {
-  return [...new Set(walkDir(CWD, patterns))];
+/** Find all .ts files that call defineFeaturePlugin */
+function findPluginFiles() {
+  const tsFiles = walkTs(SCAN_DIR);
+  const plugins = [];
+  for (const file of tsFiles) {
+    const content = readFileSync(file, 'utf-8');
+    if (content.includes('defineFeaturePlugin(')) {
+      const match = content.match(/export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/);
+      if (match) {
+        plugins.push({ absPath: file, relPath: relative(CWD, file), exportName: match[1] });
+      }
+    }
+  }
+  return plugins;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
-function findPluginExport(filePath) {
-  const content = readFileSync(resolve(CWD, filePath), 'utf-8');
-  const match = content.match(/export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/);
-  return match ? match[1] : null;
-}
-
 function extractPluginEntries(filePath) {
-  const content = readFileSync(resolve(CWD, filePath), 'utf-8');
+  const content = readFileSync(filePath, 'utf-8');
   const entries = [];
-  const dir = dirname(filePath);
+  const dir = dirname(relative(CWD, filePath));
 
   const routeRegex = /{\s*path:\s*['"`]([^'"`]+)['"`]\s*,\s*component:\s*(?:(\w+)|.*?import\(['"`]([^'"`]+)['"`]\))/g;
   let match;
@@ -122,37 +153,23 @@ function hasExportedAttrs(filePath) {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const PLUGIN_PATTERNS = [
-  'src/**/*plugin*.ts',
-  'examples/**/*plugin*.ts',
-  'app/**/*plugin*.ts',
-  'plugins/**/*.ts',
-  '*plugin*.ts',
-];
-
-const pluginFiles = findFiles(PLUGIN_PATTERNS);
-if (pluginFiles.length === 0) {
-  console.log('No plugin files found. Searched:', PLUGIN_PATTERNS);
+const plugins = findPluginFiles();
+if (plugins.length === 0) {
+  console.log('No files with defineFeaturePlugin() found.');
+  console.log(`Scanned: ${relative(CWD, SCAN_DIR) || '.'}`);
+  console.log('Tip: use -d <dir> to specify scan directory');
   process.exit(0);
 }
 
-console.log(`Found ${pluginFiles.length} plugin file(s):`);
-pluginFiles.forEach((f) => console.log(`  ${f}`));
+console.log(`Found ${plugins.length} plugin(s):`);
+plugins.forEach((p) => console.log(`  ${p.relPath} → ${p.exportName}`));
 
-// Find plugin exports for Register
-const plugins = [];
-for (const file of pluginFiles) {
-  const exportName = findPluginExport(file);
-  if (exportName) plugins.push({ path: file, exportName });
-}
-
-// Extract all entries
+// Extract entries
 const allEntries = [];
-for (const file of pluginFiles) {
-  allEntries.push(...extractPluginEntries(file));
+for (const plugin of plugins) {
+  allEntries.push(...extractPluginEntries(plugin.absPath));
 }
 
-// Filter entries with components that export Attrs
 const routeAttrs = [];
 const dialogAttrs = [];
 const controlAttrs = [];
@@ -165,25 +182,22 @@ for (const entry of allEntries) {
   target.push({ key: entry.key, file: entry.componentFile });
 }
 
-// ── Generate output ───────────────────────────────────────────────────────
+// ── Generate ────────────────────────────────────────────────────────────────
+
 const outputDir = dirname(resolve(CWD, OUTPUT_FILE));
 const lines = [
   '/* Auto-generated by vue-micro-router-gen. DO NOT EDIT. */',
-  `/* Run: npx vue-micro-router-gen */`,
+  '/* Run: npx vue-micro-router-gen */',
   '',
 ];
 
-// Import plugin types
 for (const plugin of plugins) {
-  const relPath = relative(outputDir, resolve(CWD, plugin.path)).replace(/\\/g, '/');
+  const relPath = relative(outputDir, resolve(CWD, plugin.relPath)).replace(/\\/g, '/');
   const importPath = relPath.startsWith('.') ? relPath : `./${relPath}`;
-  const cleanPath = importPath.replace(/\.ts$/, '');
-  lines.push(`import type { ${plugin.exportName} } from '${cleanPath}';`);
+  lines.push(`import type { ${plugin.exportName} } from '${importPath.replace(/\.ts$/, '')}';`);
 }
 
-// Import Attrs types from components
-const mapEntries = { route: routeAttrs, dialog: dialogAttrs, control: controlAttrs };
-for (const [kind, entries] of Object.entries(mapEntries)) {
+for (const [kind, entries] of Object.entries({ route: routeAttrs, dialog: dialogAttrs, control: controlAttrs })) {
   for (const entry of entries) {
     const alias = `${kind}_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
     const relPath = relative(outputDir, resolve(CWD, entry.file)).replace(/\\/g, '/');
@@ -196,41 +210,24 @@ lines.push('');
 lines.push(`declare module '${MODULE_NAME}' {`);
 
 if (plugins.length > 0) {
-  const pluginUnion = plugins.map((p) => `typeof ${p.exportName}`).join(' | ');
   lines.push('  interface Register {');
-  lines.push(`    plugin: ${pluginUnion};`);
+  lines.push(`    plugin: ${plugins.map((p) => `typeof ${p.exportName}`).join(' | ')};`);
   lines.push('  }');
 }
 
-if (routeAttrs.length > 0) {
-  lines.push('  interface RouteAttrsMap {');
-  for (const entry of routeAttrs) {
-    const alias = `route_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    lines.push(`    ${entry.key}: ${alias};`);
+for (const [mapName, entries] of [['RouteAttrsMap', routeAttrs], ['DialogAttrsMap', dialogAttrs], ['ControlAttrsMap', controlAttrs]]) {
+  if (entries.length > 0) {
+    lines.push(`  interface ${mapName} {`);
+    for (const entry of entries) {
+      const kind = mapName.replace('AttrsMap', '').toLowerCase();
+      const alias = `${kind}_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      lines.push(`    ${entry.key}: ${alias};`);
+    }
+    lines.push('  }');
   }
-  lines.push('  }');
-}
-
-if (dialogAttrs.length > 0) {
-  lines.push('  interface DialogAttrsMap {');
-  for (const entry of dialogAttrs) {
-    const alias = `dialog_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    lines.push(`    ${entry.key}: ${alias};`);
-  }
-  lines.push('  }');
-}
-
-if (controlAttrs.length > 0) {
-  lines.push('  interface ControlAttrsMap {');
-  for (const entry of controlAttrs) {
-    const alias = `control_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    lines.push(`    ${entry.key}: ${alias};`);
-  }
-  lines.push('  }');
 }
 
 lines.push('}', '');
-
 writeFileSync(resolve(CWD, OUTPUT_FILE), lines.join('\n'));
 console.log(`\n✅ Generated ${OUTPUT_FILE}`);
 console.log(`   Plugins: ${plugins.length}, Routes: ${routeAttrs.length}, Dialogs: ${dialogAttrs.length}, Controls: ${controlAttrs.length}`);
