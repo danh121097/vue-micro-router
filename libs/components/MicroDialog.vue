@@ -118,10 +118,21 @@ onMounted(() => {
         `dialog-transition-${transition}`,
         dialog.closing && 'micro-dialog--closing'
       ]"
-      :style="{
-        '--dialog-duration': `${duration}ms`,
-        zIndex: 100 + stackIndex
-      }"
+      :style="[
+        {
+          '--dialog-duration': `${duration}ms`,
+          zIndex: 100 + stackIndex,
+        },
+        dialog.fullscreen ? {
+          width: '100vw',
+          height: '100dvh',
+          maxWidth: '100vw',
+          maxHeight: '100dvh',
+          margin: '0',
+          padding: '0',
+          inset: '0',
+        } : {},
+      ]"
       @cancel="handleCancel"
       @click="handleBackdropClick"
     >
