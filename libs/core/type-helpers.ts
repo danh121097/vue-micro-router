@@ -66,24 +66,32 @@ export type ExtractControlNames<T> =
  */
 
 /**
- * Conditional rest args pattern:
- * - Route in AttrsMap → [props: AttrsMap[K]] (required)
- * - Route not in AttrsMap → [props?: Record<string, unknown>] (optional)
+ * Check if type has any required keys.
+ * {} extends T means all keys optional → true. Otherwise false.
  */
+type HasRequiredKeys<T> = {} extends T ? false : true;
+
+/**
+ * Conditional rest args:
+ * - Route in AttrsMap with required keys → [props: AttrsMap[K]] (must pass)
+ * - Route in AttrsMap with all optional → [props?: AttrsMap[K]] (can skip)
+ * - Route not in AttrsMap → [props?: Record<string, unknown>]
+ */
+type PropsArgs<K, AttrsMap> =
+  K extends keyof AttrsMap
+    ? HasRequiredKeys<AttrsMap[K]> extends true
+      ? [props: AttrsMap[K]]
+      : [props?: AttrsMap[K]]
+    : [props?: Record<string, unknown>];
+
 export interface PluginTypedPush<Routes extends string, AttrsMap = {}> {
-  <K extends Routes>(
-    destination: K,
-    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
-  ): Promise<void>;
+  <K extends Routes>(destination: K, ...args: PropsArgs<K, AttrsMap>): Promise<void>;
   (destination: number, props?: Record<string, unknown>): Promise<void>;
   (destination: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
 export interface PluginTypedStepWisePush<Routes extends string, AttrsMap = {}> {
-  <K extends Routes>(
-    targetPath: K,
-    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
-  ): Promise<void>;
+  <K extends Routes>(targetPath: K, ...args: PropsArgs<K, AttrsMap>): Promise<void>;
   (targetPath: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
@@ -92,10 +100,7 @@ export interface PluginTypedStepWiseBack {
 }
 
 export interface PluginTypedOpenDialog<Dialogs extends string, AttrsMap = {}> {
-  <K extends Dialogs>(
-    path: K,
-    ...args: K extends keyof AttrsMap ? [props: AttrsMap[K]] : [props?: Record<string, unknown>]
-  ): { path: string; attrs?: Record<string, unknown> };
+  <K extends Dialogs>(path: K, ...args: PropsArgs<K, AttrsMap>): { path: string; attrs?: Record<string, unknown> };
 }
 
 export interface PluginTypedCloseDialog<Dialogs extends string> {
@@ -106,7 +111,7 @@ export interface PluginTypedToggleControl<Controls extends string, AttrsMap = {}
   <K extends Controls>(
     name: K,
     active: boolean,
-    ...args: K extends keyof AttrsMap ? [attrs: AttrsMap[K]] : [attrs?: Record<string, unknown>]
+    ...args: PropsArgs<K, AttrsMap>
   ): void;
 }
 
