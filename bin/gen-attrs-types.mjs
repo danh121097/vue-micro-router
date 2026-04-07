@@ -12,7 +12,13 @@
  *   npx vue-micro-router-gen -d src             # scan specific dir
  *   npx vue-micro-router-gen --help
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, watch as fsWatch } from 'fs';
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  readdirSync,
+  watch as fsWatch
+} from 'fs';
 import { resolve, relative, dirname, join, extname } from 'path';
 
 const CWD = process.cwd();
@@ -56,7 +62,10 @@ Convention: Components export \`interface Attrs\` for typed push()/openDialog() 
 // Auto-detect scan directory
 if (!scanDir) {
   for (const dir of ['src', 'app', 'lib']) {
-    if (existsSync(resolve(CWD, dir))) { scanDir = dir; break; }
+    if (existsSync(resolve(CWD, dir))) {
+      scanDir = dir;
+      break;
+    }
   }
   if (!scanDir) scanDir = '.';
 }
@@ -72,7 +81,15 @@ console.log(`Output: ${outputFile}`);
 
 // ── Walk ────────────────────────────────────────────────────────────────────
 
-const SKIP = new Set(['node_modules', 'dist', '.git', '.nuxt', '.next', '.output', '.vite']);
+const SKIP = new Set([
+  'node_modules',
+  'dist',
+  '.git',
+  '.nuxt',
+  '.next',
+  '.output',
+  '.vite'
+]);
 
 function walk(dir, exts) {
   const results = [];
@@ -81,9 +98,12 @@ function walk(dir, exts) {
       if (SKIP.has(entry.name) || entry.name.startsWith('.')) continue;
       const full = join(dir, entry.name);
       if (entry.isDirectory()) results.push(...walk(full, exts));
-      else if (entry.isFile() && exts.includes(extname(entry.name))) results.push(full);
+      else if (entry.isFile() && exts.includes(extname(entry.name)))
+        results.push(full);
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
   return results;
 }
 
@@ -93,7 +113,7 @@ function walk(dir, exts) {
 function resolveAlias(importPath) {
   // Common alias patterns
   const aliasPrefixes = ['@/', '~/', '#/'];
-  const prefix = aliasPrefixes.find(p => importPath.startsWith(p));
+  const prefix = aliasPrefixes.find((p) => importPath.startsWith(p));
   if (!prefix) return null;
 
   const stripped = importPath.slice(prefix.length);
@@ -123,7 +143,8 @@ function resolveComponent(fromDir, importPath) {
 // ── Bracket-aware parsing ───────────────────────────────────────────────────
 
 function extractBracketContent(str, pos) {
-  let depth = 1, i = pos;
+  let depth = 1,
+    i = pos;
   while (i < str.length && depth > 0) {
     if (str[i] === '[') depth++;
     else if (str[i] === ']') depth--;
@@ -137,8 +158,14 @@ function extractEntryBlocks(str) {
   let i = 0;
   while (i < str.length) {
     if (str[i] === '{') {
-      let d = 1, s = i; i++;
-      while (i < str.length && d > 0) { if (str[i]==='{') d++; else if (str[i]==='}') d--; i++; }
+      let d = 1,
+        s = i;
+      i++;
+      while (i < str.length && d > 0) {
+        if (str[i] === '{') d++;
+        else if (str[i] === '}') d--;
+        i++;
+      }
       blocks.push(str.substring(s, i));
     } else i++;
   }
@@ -152,8 +179,15 @@ function findPlugins() {
   for (const file of walk(SCAN_PATH, ['.ts'])) {
     const content = readFileSync(file, 'utf-8');
     if (!content.includes('defineFeaturePlugin(')) continue;
-    const match = content.match(/export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/);
-    if (match) plugins.push({ absPath: file, relPath: relative(CWD, file), exportName: match[1] });
+    const match = content.match(
+      /export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/
+    );
+    if (match)
+      plugins.push({
+        absPath: file,
+        relPath: relative(CWD, file),
+        exportName: match[1]
+      });
   }
   return plugins;
 }
@@ -166,26 +200,35 @@ function extractEntries(filePath) {
   const sections = [
     { kind: 'route', regex: /routes\s*:\s*\[/g },
     { kind: 'dialog', regex: /dialogs\s*:\s*\[/g },
-    { kind: 'control', regex: /controls\s*:\s*\[/g },
+    { kind: 'control', regex: /controls\s*:\s*\[/g }
   ];
 
   for (const { kind, regex } of sections) {
     let m;
     while ((m = regex.exec(content)) !== null) {
-      const arrayContent = extractBracketContent(content, m.index + m[0].length);
+      const arrayContent = extractBracketContent(
+        content,
+        m.index + m[0].length
+      );
       for (const block of extractEntryBlocks(arrayContent)) {
         const keyField = kind === 'control' ? 'name' : 'path';
-        const keyMatch = block.match(new RegExp(`${keyField}\\s*:\\s*['"\`]([^'"\`]+)['"\`]`));
+        const keyMatch = block.match(
+          new RegExp(`${keyField}\\s*:\\s*['"\`]([^'"\`]+)['"\`]`)
+        );
         if (!keyMatch) continue;
 
         let componentFile = null;
-        const impMatch = block.match(/component\s*:\s*\(\)\s*=>\s*import\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+        const impMatch = block.match(
+          /component\s*:\s*\(\)\s*=>\s*import\(\s*['"`]([^'"`]+)['"`]\s*\)/
+        );
         const varMatch = block.match(/component\s*:\s*(\w+)/);
 
         if (impMatch) {
           componentFile = resolveComponent(dir, impMatch[1]);
         } else if (varMatch && !['true', 'false'].includes(varMatch[1])) {
-          const importRegex = new RegExp(`import\\s+${varMatch[1]}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
+          const importRegex = new RegExp(
+            `import\\s+${varMatch[1]}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`
+          );
           const imp = content.match(importRegex);
           if (imp) componentFile = resolveComponent(dir, imp[1]);
         }
@@ -199,8 +242,12 @@ function extractEntries(filePath) {
 
 function hasAttrs(filePath) {
   try {
-    return /export\s+interface\s+Attrs\b/.test(readFileSync(resolve(CWD, filePath), 'utf-8'));
-  } catch { return false; }
+    return /export\s+interface\s+Attrs\b/.test(
+      readFileSync(resolve(CWD, filePath), 'utf-8')
+    );
+  } catch {
+    return false;
+  }
 }
 
 // ── Generate ────────────────────────────────────────────────────────────────
@@ -213,9 +260,9 @@ function generate() {
   }
 
   console.log(`Plugins: ${plugins.length}`);
-  plugins.forEach(p => console.log(`  ${p.relPath} → ${p.exportName}`));
+  plugins.forEach((p) => console.log(`  ${p.relPath} → ${p.exportName}`));
 
-  const allEntries = plugins.flatMap(p => extractEntries(p.absPath));
+  const allEntries = plugins.flatMap((p) => extractEntries(p.absPath));
 
   const typed = { route: [], dialog: [], control: [] };
   const untyped = { route: 0, dialog: 0, control: 0 };
@@ -229,26 +276,35 @@ function generate() {
   }
 
   console.log(`Routes: ${typed.route.length} typed / ${untyped.route} untyped`);
-  console.log(`Dialogs: ${typed.dialog.length} typed / ${untyped.dialog} untyped`);
-  console.log(`Controls: ${typed.control.length} typed / ${untyped.control} untyped`);
+  console.log(
+    `Dialogs: ${typed.dialog.length} typed / ${untyped.dialog} untyped`
+  );
+  console.log(
+    `Controls: ${typed.control.length} typed / ${untyped.control} untyped`
+  );
 
   const outDir = dirname(resolve(CWD, outputFile));
   const lines = [
     '/* Auto-generated by vue-micro-router-gen. DO NOT EDIT. */',
     '/* Regenerate: npx vue-micro-router-gen */',
-    '',
+    ''
   ];
 
   for (const p of plugins) {
     const rel = relative(outDir, resolve(CWD, p.relPath)).replace(/\\/g, '/');
     const imp = rel.startsWith('.') ? rel : `./${rel}`;
-    lines.push(`import type { ${p.exportName} } from '${imp.replace(/\.ts$/, '')}';`);
+    lines.push(
+      `import type { ${p.exportName} } from '${imp.replace(/\.ts$/, '')}';`
+    );
   }
 
   for (const [kind, entries] of Object.entries(typed)) {
     for (const e of entries) {
       const alias = `${kind}_${e.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      const rel = relative(outDir, resolve(CWD, e.componentFile)).replace(/\\/g, '/');
+      const rel = relative(outDir, resolve(CWD, e.componentFile)).replace(
+        /\\/g,
+        '/'
+      );
       const imp = rel.startsWith('.') ? rel : `./${rel}`;
       lines.push(`import type { Attrs as ${alias} } from '${imp}';`);
     }
@@ -259,11 +315,17 @@ function generate() {
 
   if (plugins.length > 0) {
     lines.push('  interface Register {');
-    lines.push(`    plugin: ${plugins.map(p => `typeof ${p.exportName}`).join(' | ')};`);
+    lines.push(
+      `    plugin: ${plugins.map((p) => `typeof ${p.exportName}`).join(' | ')};`
+    );
     lines.push('  }');
   }
 
-  for (const [mapName, kind] of [['RouteAttrsMap', 'route'], ['DialogAttrsMap', 'dialog'], ['ControlAttrsMap', 'control']]) {
+  for (const [mapName, kind] of [
+    ['RouteAttrsMap', 'route'],
+    ['DialogAttrsMap', 'dialog'],
+    ['ControlAttrsMap', 'control']
+  ]) {
     if (typed[kind].length > 0) {
       lines.push(`  interface ${mapName} {`);
       for (const e of typed[kind]) {
@@ -275,7 +337,20 @@ function generate() {
   }
 
   lines.push('}', '');
-  writeFileSync(resolve(CWD, outputFile), lines.join('\n'));
+  const newContent = lines.join('\n');
+  const outPath = resolve(CWD, outputFile);
+  // Only write if content actually changed — prevents unnecessary HMR/reload triggers
+  let existing = '';
+  try {
+    existing = readFileSync(outPath, 'utf-8');
+  } catch {
+    console.error('error', error);
+  }
+  if (existing === newContent) {
+    console.log(`✅ ${outputFile} (unchanged)`);
+    return true;
+  }
+  writeFileSync(outPath, newContent);
   console.log(`✅ ${outputFile}`);
   return true;
 }
@@ -291,7 +366,9 @@ if (watchMode) {
   const regenerate = () => {
     clearTimeout(debounce);
     debounce = setTimeout(() => {
-      console.log(`\n[${new Date().toLocaleTimeString()}] Change detected, regenerating...`);
+      console.log(
+        `\n[${new Date().toLocaleTimeString()}] Change detected, regenerating...`
+      );
       generate();
     }, 300);
   };
