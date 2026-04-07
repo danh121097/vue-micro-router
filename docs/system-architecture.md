@@ -583,11 +583,11 @@ toggleControl('main_hud', true); // ✅ TS knows valid controls
 
 ### Per-Route Typed Attrs
 
-Components export `interface Attrs` → `bun run gen:types` generates `vue-micro-router.d.ts` with augmentations for `RouteAttrsMap` / `DialogAttrsMap` / `ControlAttrsMap`.
+Components export `interface Attrs` → `npx vue-micro-router-gen` generates `src/vue-micro-router.d.ts` with augmentations for `RouteAttrsMap` / `DialogAttrsMap` / `ControlAttrsMap`.
 
 **Flow:**
 ```
-Component exports Attrs → gen:types scans plugins → generates .d.ts → TS infers per-call
+Component exports Attrs → npx vue-micro-router-gen scans plugins → generates .d.ts → TS infers per-call
 ```
 
 **Type resolution per-call:**

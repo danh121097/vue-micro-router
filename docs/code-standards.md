@@ -754,20 +754,25 @@ const { userId, username, meta } = useMicroState<Attrs>({ userId: 0, username: '
 </script>
 ```
 
-Run `bun run gen:types` to auto-generate `vue-micro-router.d.ts` mapping routes→attrs.
+Run `npx vue-micro-router-gen` to auto-generate type augmentations:
+- Auto-detects `src/` or `app/` as scan dir, outputs `src/vue-micro-router.d.ts`
+- Scans all `.ts` files for `defineFeaturePlugin()` (any folder structure)
+- Resolves `@/`, `~/`, `#/` path aliases
+- Reports typed vs untyped counts per category
 
 ```ts
-push('profile', { userId: 42, username: 'Danh' }); // ✅ typed
+push('profile', { userId: 42, username: 'Danh' }); // ✅ typed (required fields)
 push('profile');                                     // ❌ missing required props
-push('home');                                        // ✅ no attrs = optional
+push('profile', { meta: { title: 'Hi' } });         // ✅ optional fields can skip
+push('home');                                        // ✅ no attrs = untyped
 ```
 
 Augmented interfaces: `RouteAttrsMap`, `DialogAttrsMap`, `ControlAttrsMap`.
 
 **Rules:**
 - Required fields → must pass in push/openDialog
-- Optional fields (`?`) → can omit
-- Re-run `bun run gen:types` after adding/changing Attrs
+- Optional fields (`?`) → can omit entirely including the props arg
+- Re-run `npx vue-micro-router-gen` after adding/changing Attrs
 
 ### Type-Level Testing
 

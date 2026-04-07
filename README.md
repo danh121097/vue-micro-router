@@ -333,26 +333,37 @@ const { title, message, onConfirm } = useMicroState<Attrs>({
 **Step 2:** Run code generation:
 
 ```bash
-bun run gen:types
+npx vue-micro-router-gen          # auto-detects src/ or app/, outputs src/vue-micro-router.d.ts
+npx vue-micro-router-gen -d src   # explicit scan directory
+npx vue-micro-router-gen -o types/router.d.ts  # custom output path
 ```
 
-This scans plugin files, finds components with `export interface Attrs`, and generates `vue-micro-router.d.ts` with all type mappings.
+The script:
+- Scans **all `.ts` files** for `defineFeaturePlugin()` calls (any folder structure)
+- Resolves `@/`, `~/`, `#/` path aliases automatically
+- Finds `.vue` components with `export interface Attrs`
+- Generates `vue-micro-router.d.ts` with Register + AttrsMap augmentations
 
-**Step 3:** Typed everywhere — no extra work:
+**Step 3:** Include in tsconfig and enjoy typed everywhere:
+
+```jsonc
+// tsconfig.json — add the generated file
+{ "include": ["src/**/*.ts", "src/**/*.vue", "src/vue-micro-router.d.ts"] }
+```
 
 ```ts
 push('profile', { userId: 42, username: 'Danh' });  // ✅ typed, autocomplete
 push('profile');                                      // ❌ TS error: missing required props
-push('home');                                         // ✅ OK (no Attrs defined → optional)
+push('profile', { meta: { title: 'Hi' } });          // ✅ optional fields can be skipped
+push('home');                                         // ✅ OK (no Attrs → untyped)
 openDialog('confirm', { title: 'Sure?' });            // ✅ typed
-stepWisePush('profile', { userId: 1, username: 'A' }); // ✅ typed
 ```
 
 **Rules:**
 - Required fields in `Attrs` → must pass in `push()` / `openDialog()`
-- Optional fields (`?`) → can omit
+- Optional fields (`?`) → can skip entirely, including the whole props arg
 - Routes without `export interface Attrs` → `push()` accepts any `Record<string, unknown>`
-- Re-run `bun run gen:types` after adding/changing `Attrs` interfaces
+- Re-run `npx vue-micro-router-gen` after adding/changing `Attrs` interfaces
 
 ### State Serialization
 
@@ -604,12 +615,19 @@ Includes page slide/fade transitions, dialog animations, control fade transition
 ## Development
 
 ```bash
-bun run lint       # ESLint check
-bun run lint:fix   # Auto-fix lint issues
-bun test           # Run all tests
-bun run typecheck  # TypeScript strict check
-bun run build      # Build package
+bun run lint        # ESLint check
+bun run lint:fix    # Auto-fix lint issues
+bun test            # Run all tests
+bun run typecheck   # TypeScript strict check
+bun run build       # Build package
+bun run gen:types   # Generate vue-micro-router.d.ts (local dev)
 bun run dev:example # Run example app
+bun run publish:npm # Bump version + build + publish + tag + release
+```
+
+For consumers:
+```bash
+npx vue-micro-router-gen  # Generate type augmentations in consumer project
 ```
 
 ## API Reference
