@@ -39,10 +39,11 @@ export function useAudioManager(
 ): AudioManagerState {
   let isVisibilityChange = false;
   const defaultBgm = config?.defaultBgm ?? '';
-  let previousSoundSrc = defaultBgm;
+  /** Start empty so first updateBackgroundMusic always triggers playSound */
+  let previousSoundSrc = '';
 
   const adapter: AudioAdapter = config?.adapter ?? new HowlerAdapter();
-  const soundSrc = ref<string>(defaultBgm);
+  const soundSrc = ref<string>('');
   const resolveUrl = config?.urlResolver ?? ((name: string) => name);
   const volume = computed(() => (config?.volumeRef?.value ?? 100) / 100);
 
@@ -74,7 +75,7 @@ export function useAudioManager(
     try {
       const routeKey = route.split('/').pop() || 'home';
       const registered = routes.get(routeKey);
-      const newSrc = registered?.bgm || soundSrc.value;
+      const newSrc = registered?.bgm || defaultBgm;
 
       const fromKey = previousSoundSrc;
       if (fromKey && newSrc && fromKey !== newSrc) {
