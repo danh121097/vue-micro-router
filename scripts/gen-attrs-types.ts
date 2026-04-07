@@ -72,54 +72,103 @@ function findPluginExport(filePath: string): string | null {
   return match ? match[1] : null;
 }
 
+/** Extract top-level { ... } blocks from array content — bracket-aware */
+function extractEntryBlocks(str: string): string[] {
+  const blocks: string[] = [];
+  let i = 0;
+  while (i < str.length) {
+    if (str[i] === '{') {
+      let depth = 1;
+      const start = i;
+      i++;
+      while (i < str.length && depth > 0) {
+        if (str[i] === '{') depth++;
+        else if (str[i] === '}') depth--;
+        i++;
+      }
+      blocks.push(str.substring(start, i));
+    } else {
+      i++;
+    }
+  }
+  return blocks;
+}
+
+/** Extract content between matching brackets starting at pos (after opening bracket) */
+function extractBracketContent(str: string, pos: number): string {
+  let depth = 1;
+  let i = pos;
+  while (i < str.length && depth > 0) {
+    if (str[i] === '[') depth++;
+    else if (str[i] === ']') depth--;
+    i++;
+  }
+  return str.substring(pos, i - 1);
+}
+
 function extractPluginEntries(filePath: string): PluginEntry[] {
   const content = readFileSync(resolve(CWD, filePath), 'utf-8');
   const entries: PluginEntry[] = [];
   const dir = dirname(filePath);
 
-  const routeRegex = /{\s*path:\s*['"`]([^'"`]+)['"`]\s*,\s*component:\s*(?:(\w+)|.*?import\(['"`]([^'"`]+)['"`]\))/g;
-  let match;
-  while ((match = routeRegex.exec(content)) !== null) {
-    const [, path, componentVar, importPath] = match;
-    let componentFile: string | null = null;
+  const sections: { kind: PluginEntry['kind']; regex: RegExp }[] = [
+    { kind: 'route', regex: /routes\s*:\s*\[/g },
+    { kind: 'dialog', regex: /dialogs\s*:\s*\[/g },
+    { kind: 'control', regex: /controls\s*:\s*\[/g },
+  ];
 
-    if (importPath) {
-      componentFile = resolveComponentPath(dir, importPath);
-    } else if (componentVar) {
-      const importRegex = new RegExp(`import\\s+${componentVar}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
-      const importMatch = content.match(importRegex);
-      if (importMatch) {
-        componentFile = resolveComponentPath(dir, importMatch[1]);
+  for (const section of sections) {
+    let sectionMatch;
+    while ((sectionMatch = section.regex.exec(content)) !== null) {
+      const start = sectionMatch.index + sectionMatch[0].length;
+      const arrayContent = extractBracketContent(content, start);
+
+      const entryBlocks = extractEntryBlocks(arrayContent);
+      for (const block of entryBlocks) {
+        const keyField = section.kind === 'control' ? 'name' : 'path';
+        const keyMatch = block.match(new RegExp(`${keyField}\\s*:\\s*['"\`]([^'"\`]+)['"\`]`));
+        if (!keyMatch) continue;
+
+        const key = keyMatch[1];
+        let componentFile: string | null = null;
+
+        const importMatch = block.match(/component\s*:\s*\(\)\s*=>\s*import\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+        const varMatch = block.match(/component\s*:\s*(\w+)/);
+
+        if (importMatch) {
+          componentFile = resolveComponentPath(dir, importMatch[1]);
+        } else if (varMatch && !['true', 'false'].includes(varMatch[1])) {
+          const importRegex = new RegExp(`import\\s+${varMatch[1]}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
+          const impMatch = content.match(importRegex);
+          if (impMatch) componentFile = resolveComponentPath(dir, impMatch[1]);
+        }
+
+        entries.push({ kind: section.kind, key, componentFile });
       }
     }
-
-    const beforeMatch = content.substring(0, match.index);
-    const isDialog = /dialogs\s*:\s*\[(?:[^\]]*,)*\s*$/.test(beforeMatch);
-    entries.push({ kind: isDialog ? 'dialog' : 'route', key: path, componentFile });
-  }
-
-  const controlRegex = /{\s*name:\s*['"`]([^'"`]+)['"`]\s*,\s*component:\s*(?:(\w+)|.*?import\(['"`]([^'"`]+)['"`]\))/g;
-  while ((match = controlRegex.exec(content)) !== null) {
-    const [, name, componentVar, importPath] = match;
-    let componentFile: string | null = null;
-
-    if (importPath) {
-      componentFile = resolveComponentPath(dir, importPath);
-    } else if (componentVar) {
-      const importRegex = new RegExp(`import\\s+${componentVar}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
-      const importMatch = content.match(importRegex);
-      if (importMatch) {
-        componentFile = resolveComponentPath(dir, importMatch[1]);
-      }
-    }
-
-    entries.push({ kind: 'control', key: name, componentFile });
   }
 
   return entries;
 }
 
+/** Resolve @ alias — try src/, app/, lib/, or tsconfig paths */
+function resolveAlias(importPath: string): string {
+  if (!importPath.startsWith('@/')) return importPath;
+  const stripped = importPath.slice(2);
+  for (const base of ['src', 'app', 'lib', 'libs', '.']) {
+    const fullPath = resolve(CWD, base, stripped);
+    if (existsSync(fullPath)) return relative(CWD, fullPath);
+    for (const ext of ['.vue', '.ts', '.tsx', '.js', '.jsx']) {
+      if (existsSync(fullPath + ext)) return relative(CWD, fullPath + ext);
+    }
+  }
+  return importPath;
+}
+
 function resolveComponentPath(fromDir: string, importPath: string): string | null {
+  const resolved = resolveAlias(importPath);
+  if (resolved !== importPath) return resolved;
+
   const extensions = ['', '.vue', '.ts', '.tsx', '.js', '.jsx'];
   for (const ext of extensions) {
     const fullPath = resolve(CWD, fromDir, importPath + ext);

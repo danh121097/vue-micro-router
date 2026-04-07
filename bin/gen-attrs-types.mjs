@@ -1,17 +1,18 @@
 #!/usr/bin/env node
 /**
- * Auto-generate vue-micro-router.d.ts with ALL type augmentations.
+ * vue-micro-router-gen — Auto-generate typed augmentations.
  *
- * Scans ALL .ts files in the project for `defineFeaturePlugin(` calls,
- * then finds components with `export interface Attrs` for typed props.
+ * Scans project for:
+ * 1. .ts files with `defineFeaturePlugin(` → Register.plugin
+ * 2. .vue/.ts files with `export interface Attrs` → RouteAttrsMap/DialogAttrsMap/ControlAttrsMap
  *
  * Usage:
- *   npx vue-micro-router-gen                    # scan cwd, output vue-micro-router.d.ts
- *   npx vue-micro-router-gen -o types.d.ts      # custom output file
- *   npx vue-micro-router-gen -d src/plugins     # scan specific directory
+ *   npx vue-micro-router-gen                    # auto-detect, output to src/ or project root
+ *   npx vue-micro-router-gen -o src/types.d.ts  # custom output
+ *   npx vue-micro-router-gen -d src             # scan specific dir
  *   npx vue-micro-router-gen --help
  */
-import { readFileSync, writeFileSync, existsSync, readdirSync, statSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { resolve, relative, dirname, join, extname } from 'path';
 
 const CWD = process.cwd();
@@ -20,12 +21,12 @@ const MODULE_NAME = 'vue-micro-router';
 // ── Parse args ──────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-let OUTPUT_FILE = 'vue-micro-router.d.ts';
-let SCAN_DIR = CWD;
+let outputFile = '';
+let scanDir = '';
 
 for (let i = 0; i < args.length; i++) {
-  if (args[i] === '-o' || args[i] === '--output') OUTPUT_FILE = args[++i];
-  else if (args[i] === '-d' || args[i] === '--dir') SCAN_DIR = resolve(CWD, args[++i]);
+  if (args[i] === '-o' || args[i] === '--output') outputFile = args[++i];
+  else if (args[i] === '-d' || args[i] === '--dir') scanDir = args[++i];
   else if (args[i] === '--help' || args[i] === '-h') {
     console.log(`
 vue-micro-router-gen — Auto-generate typed augmentations
@@ -33,201 +34,251 @@ vue-micro-router-gen — Auto-generate typed augmentations
 Usage: npx vue-micro-router-gen [options]
 
 Options:
-  -o, --output <file>   Output file (default: vue-micro-router.d.ts)
-  -d, --dir <dir>       Directory to scan (default: cwd)
+  -o, --output <file>   Output file (auto: src/vue-micro-router.d.ts or ./vue-micro-router.d.ts)
+  -d, --dir <dir>       Directory to scan (auto-detects src/, app/, or cwd)
   -h, --help            Show this help
 
 How it works:
-  1. Scans all .ts files for \`defineFeaturePlugin(\` calls
-  2. Extracts routes/dialogs/controls from plugin definitions
-  3. Checks if component files export \`interface Attrs { ... }\`
-  4. Generates vue-micro-router.d.ts with Register + AttrsMap augmentations
+  1. Scans .ts files for defineFeaturePlugin() → auto-registers plugins
+  2. Resolves routes/dialogs/controls → finds component files
+  3. Checks .vue files for \`export interface Attrs { ... }\`
+  4. Generates vue-micro-router.d.ts with all type augmentations
 
-Convention:
-  - Components that want typed push() props: \`export interface Attrs { ... }\`
-  - Required fields = must pass in push(). Optional fields = can skip.
+Convention: Components export \`interface Attrs\` for typed push()/openDialog() props.
 `);
     process.exit(0);
   }
 }
 
-// ── Walk & scan ─────────────────────────────────────────────────────────────
+// Auto-detect scan directory
+if (!scanDir) {
+  for (const dir of ['src', 'app', 'lib']) {
+    if (existsSync(resolve(CWD, dir))) { scanDir = dir; break; }
+  }
+  if (!scanDir) scanDir = '.';
+}
+const SCAN_PATH = resolve(CWD, scanDir);
 
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.nuxt', '.next', '.output']);
+// Auto-detect output — put in scan dir if it's src/app, else root
+if (!outputFile) {
+  outputFile = scanDir !== '.' ? `${scanDir}/vue-micro-router.d.ts` : 'vue-micro-router.d.ts';
+}
 
-function walkTs(dir) {
+console.log(`Scan: ${scanDir}/`);
+console.log(`Output: ${outputFile}`);
+
+// ── Walk ────────────────────────────────────────────────────────────────────
+
+const SKIP = new Set(['node_modules', 'dist', '.git', '.nuxt', '.next', '.output', '.vite']);
+
+function walk(dir, exts) {
   const results = [];
   try {
-    const entries = readdirSync(dir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry.name)) continue;
-      const fullPath = join(dir, entry.name);
-      if (entry.isDirectory()) {
-        results.push(...walkTs(fullPath));
-      } else if (entry.isFile() && extname(entry.name) === '.ts') {
-        results.push(fullPath);
-      }
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (SKIP.has(entry.name) || entry.name.startsWith('.')) continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) results.push(...walk(full, exts));
+      else if (entry.isFile() && exts.includes(extname(entry.name))) results.push(full);
     }
-  } catch { /* skip inaccessible */ }
+  } catch { /* skip */ }
   return results;
 }
 
-/** Find all .ts files that call defineFeaturePlugin */
-function findPluginFiles() {
-  const tsFiles = walkTs(SCAN_DIR);
-  const plugins = [];
-  for (const file of tsFiles) {
-    const content = readFileSync(file, 'utf-8');
-    if (content.includes('defineFeaturePlugin(')) {
-      const match = content.match(/export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/);
-      if (match) {
-        plugins.push({ absPath: file, relPath: relative(CWD, file), exportName: match[1] });
-      }
+// ── Alias resolution ────────────────────────────────────────────────────────
+
+/** Try to resolve tsconfig/vite path aliases like @/, ~/, #/ */
+function resolveAlias(importPath) {
+  // Common alias patterns
+  const aliasPrefixes = ['@/', '~/', '#/'];
+  const prefix = aliasPrefixes.find(p => importPath.startsWith(p));
+  if (!prefix) return null;
+
+  const stripped = importPath.slice(prefix.length);
+  // Try common base directories
+  for (const base of ['src', 'app', 'lib', 'libs', '.']) {
+    for (const ext of ['', '.vue', '.ts', '.tsx', '.js', '.jsx']) {
+      const full = resolve(CWD, base, stripped + ext);
+      if (existsSync(full)) return relative(CWD, full);
     }
-  }
-  return plugins;
-}
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function extractPluginEntries(filePath) {
-  const content = readFileSync(filePath, 'utf-8');
-  const entries = [];
-  const dir = dirname(relative(CWD, filePath));
-
-  const routeRegex = /{\s*path:\s*['"`]([^'"`]+)['"`]\s*,\s*component:\s*(?:(\w+)|.*?import\(['"`]([^'"`]+)['"`]\))/g;
-  let match;
-  while ((match = routeRegex.exec(content)) !== null) {
-    const [, path, componentVar, importPath] = match;
-    let componentFile = null;
-
-    if (importPath) {
-      componentFile = resolveComponentPath(dir, importPath);
-    } else if (componentVar) {
-      const importRegex = new RegExp(`import\\s+${componentVar}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
-      const importMatch = content.match(importRegex);
-      if (importMatch) componentFile = resolveComponentPath(dir, importMatch[1]);
-    }
-
-    const beforeMatch = content.substring(0, match.index);
-    const isDialog = /dialogs\s*:\s*\[(?:[^\]]*,)*\s*$/.test(beforeMatch);
-    entries.push({ kind: isDialog ? 'dialog' : 'route', key: path, componentFile });
-  }
-
-  const controlRegex = /{\s*name:\s*['"`]([^'"`]+)['"`]\s*,\s*component:\s*(?:(\w+)|.*?import\(['"`]([^'"`]+)['"`]\))/g;
-  while ((match = controlRegex.exec(content)) !== null) {
-    const [, name, componentVar, importPath] = match;
-    let componentFile = null;
-
-    if (importPath) {
-      componentFile = resolveComponentPath(dir, importPath);
-    } else if (componentVar) {
-      const importRegex = new RegExp(`import\\s+${componentVar}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
-      const importMatch = content.match(importRegex);
-      if (importMatch) componentFile = resolveComponentPath(dir, importMatch[1]);
-    }
-
-    entries.push({ kind: 'control', key: name, componentFile });
-  }
-
-  return entries;
-}
-
-function resolveComponentPath(fromDir, importPath) {
-  const extensions = ['', '.vue', '.ts', '.tsx', '.js', '.jsx'];
-  for (const ext of extensions) {
-    const fullPath = resolve(CWD, fromDir, importPath + ext);
-    if (existsSync(fullPath)) return relative(CWD, fullPath);
   }
   return null;
 }
 
-function hasExportedAttrs(filePath) {
-  try {
-    const content = readFileSync(resolve(CWD, filePath), 'utf-8');
-    return /export\s+interface\s+Attrs\b/.test(content);
-  } catch {
-    return false;
+function resolveComponent(fromDir, importPath) {
+  // Try alias first
+  const aliased = resolveAlias(importPath);
+  if (aliased) return aliased;
+
+  // Relative path
+  for (const ext of ['', '.vue', '.ts', '.tsx', '.js', '.jsx']) {
+    const full = resolve(CWD, fromDir, importPath + ext);
+    if (existsSync(full)) return relative(CWD, full);
   }
+  return null;
+}
+
+// ── Bracket-aware parsing ───────────────────────────────────────────────────
+
+function extractBracketContent(str, pos) {
+  let depth = 1, i = pos;
+  while (i < str.length && depth > 0) {
+    if (str[i] === '[') depth++;
+    else if (str[i] === ']') depth--;
+    i++;
+  }
+  return str.substring(pos, i - 1);
+}
+
+function extractEntryBlocks(str) {
+  const blocks = [];
+  let i = 0;
+  while (i < str.length) {
+    if (str[i] === '{') {
+      let d = 1, s = i; i++;
+      while (i < str.length && d > 0) { if (str[i]==='{') d++; else if (str[i]==='}') d--; i++; }
+      blocks.push(str.substring(s, i));
+    } else i++;
+  }
+  return blocks;
+}
+
+// ── Plugin extraction ───────────────────────────────────────────────────────
+
+function findPlugins() {
+  const plugins = [];
+  for (const file of walk(SCAN_PATH, ['.ts'])) {
+    const content = readFileSync(file, 'utf-8');
+    if (!content.includes('defineFeaturePlugin(')) continue;
+    const match = content.match(/export\s+const\s+(\w+)\s*=\s*defineFeaturePlugin\(/);
+    if (match) plugins.push({ absPath: file, relPath: relative(CWD, file), exportName: match[1] });
+  }
+  return plugins;
+}
+
+function extractEntries(filePath) {
+  const content = readFileSync(filePath, 'utf-8');
+  const entries = [];
+  const dir = dirname(relative(CWD, filePath));
+
+  const sections = [
+    { kind: 'route', regex: /routes\s*:\s*\[/g },
+    { kind: 'dialog', regex: /dialogs\s*:\s*\[/g },
+    { kind: 'control', regex: /controls\s*:\s*\[/g },
+  ];
+
+  for (const { kind, regex } of sections) {
+    let m;
+    while ((m = regex.exec(content)) !== null) {
+      const arrayContent = extractBracketContent(content, m.index + m[0].length);
+      for (const block of extractEntryBlocks(arrayContent)) {
+        const keyField = kind === 'control' ? 'name' : 'path';
+        const keyMatch = block.match(new RegExp(`${keyField}\\s*:\\s*['"\`]([^'"\`]+)['"\`]`));
+        if (!keyMatch) continue;
+
+        let componentFile = null;
+        const impMatch = block.match(/component\s*:\s*\(\)\s*=>\s*import\(\s*['"`]([^'"`]+)['"`]\s*\)/);
+        const varMatch = block.match(/component\s*:\s*(\w+)/);
+
+        if (impMatch) {
+          componentFile = resolveComponent(dir, impMatch[1]);
+        } else if (varMatch && !['true', 'false'].includes(varMatch[1])) {
+          const importRegex = new RegExp(`import\\s+${varMatch[1]}\\s+from\\s+['"\`]([^'"\`]+)['"\`]`);
+          const imp = content.match(importRegex);
+          if (imp) componentFile = resolveComponent(dir, imp[1]);
+        }
+
+        entries.push({ kind, key: keyMatch[1], componentFile });
+      }
+    }
+  }
+  return entries;
+}
+
+function hasAttrs(filePath) {
+  try {
+    return /export\s+interface\s+Attrs\b/.test(readFileSync(resolve(CWD, filePath), 'utf-8'));
+  } catch { return false; }
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
-const plugins = findPluginFiles();
+const plugins = findPlugins();
 if (plugins.length === 0) {
-  console.log('No files with defineFeaturePlugin() found.');
-  console.log(`Scanned: ${relative(CWD, SCAN_DIR) || '.'}`);
+  console.log('\nNo defineFeaturePlugin() calls found.');
   console.log('Tip: use -d <dir> to specify scan directory');
   process.exit(0);
 }
 
-console.log(`Found ${plugins.length} plugin(s):`);
-plugins.forEach((p) => console.log(`  ${p.relPath} → ${p.exportName}`));
+console.log(`\nPlugins: ${plugins.length}`);
+plugins.forEach(p => console.log(`  ${p.relPath} → ${p.exportName}`));
 
-// Extract entries
-const allEntries = [];
-for (const plugin of plugins) {
-  allEntries.push(...extractPluginEntries(plugin.absPath));
-}
+// Extract all entries from plugins
+const allEntries = plugins.flatMap(p => extractEntries(p.absPath));
 
-const routeAttrs = [];
-const dialogAttrs = [];
-const controlAttrs = [];
+// Separate by kind and filter for Attrs
+const typed = { route: [], dialog: [], control: [] };
+const untyped = { route: 0, dialog: 0, control: 0 };
 
 for (const entry of allEntries) {
-  if (!entry.componentFile || !hasExportedAttrs(entry.componentFile)) continue;
-  const target =
-    entry.kind === 'route' ? routeAttrs :
-    entry.kind === 'dialog' ? dialogAttrs : controlAttrs;
-  target.push({ key: entry.key, file: entry.componentFile });
+  if (entry.componentFile && hasAttrs(entry.componentFile)) {
+    typed[entry.kind].push(entry);
+  } else {
+    untyped[entry.kind]++;
+  }
 }
+
+console.log(`Routes: ${typed.route.length} typed / ${untyped.route} untyped`);
+console.log(`Dialogs: ${typed.dialog.length} typed / ${untyped.dialog} untyped`);
+console.log(`Controls: ${typed.control.length} typed / ${untyped.control} untyped`);
 
 // ── Generate ────────────────────────────────────────────────────────────────
 
-const outputDir = dirname(resolve(CWD, OUTPUT_FILE));
+const outDir = dirname(resolve(CWD, outputFile));
 const lines = [
   '/* Auto-generated by vue-micro-router-gen. DO NOT EDIT. */',
-  '/* Run: npx vue-micro-router-gen */',
+  '/* Regenerate: npx vue-micro-router-gen */',
   '',
 ];
 
-for (const plugin of plugins) {
-  const relPath = relative(outputDir, resolve(CWD, plugin.relPath)).replace(/\\/g, '/');
-  const importPath = relPath.startsWith('.') ? relPath : `./${relPath}`;
-  lines.push(`import type { ${plugin.exportName} } from '${importPath.replace(/\.ts$/, '')}';`);
+// Import plugins
+for (const p of plugins) {
+  const rel = relative(outDir, resolve(CWD, p.relPath)).replace(/\\/g, '/');
+  const imp = rel.startsWith('.') ? rel : `./${rel}`;
+  lines.push(`import type { ${p.exportName} } from '${imp.replace(/\.ts$/, '')}';`);
 }
 
-for (const [kind, entries] of Object.entries({ route: routeAttrs, dialog: dialogAttrs, control: controlAttrs })) {
-  for (const entry of entries) {
-    const alias = `${kind}_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const relPath = relative(outputDir, resolve(CWD, entry.file)).replace(/\\/g, '/');
-    const importPath = relPath.startsWith('.') ? relPath : `./${relPath}`;
-    lines.push(`import type { Attrs as ${alias} } from '${importPath}';`);
+// Import Attrs
+for (const [kind, entries] of Object.entries(typed)) {
+  for (const e of entries) {
+    const alias = `${kind}_${e.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const rel = relative(outDir, resolve(CWD, e.componentFile)).replace(/\\/g, '/');
+    const imp = rel.startsWith('.') ? rel : `./${rel}`;
+    lines.push(`import type { Attrs as ${alias} } from '${imp}';`);
   }
 }
 
 lines.push('');
 lines.push(`declare module '${MODULE_NAME}' {`);
 
+// Register
 if (plugins.length > 0) {
   lines.push('  interface Register {');
-  lines.push(`    plugin: ${plugins.map((p) => `typeof ${p.exportName}`).join(' | ')};`);
+  lines.push(`    plugin: ${plugins.map(p => `typeof ${p.exportName}`).join(' | ')};`);
   lines.push('  }');
 }
 
-for (const [mapName, entries] of [['RouteAttrsMap', routeAttrs], ['DialogAttrsMap', dialogAttrs], ['ControlAttrsMap', controlAttrs]]) {
-  if (entries.length > 0) {
+// AttrsMap
+for (const [mapName, kind] of [['RouteAttrsMap', 'route'], ['DialogAttrsMap', 'dialog'], ['ControlAttrsMap', 'control']]) {
+  if (typed[kind].length > 0) {
     lines.push(`  interface ${mapName} {`);
-    for (const entry of entries) {
-      const kind = mapName.replace('AttrsMap', '').toLowerCase();
-      const alias = `${kind}_${entry.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
-      lines.push(`    ${entry.key}: ${alias};`);
+    for (const e of typed[kind]) {
+      const alias = `${kind}_${e.key.replace(/[^a-zA-Z0-9]/g, '_')}`;
+      lines.push(`    '${e.key}': ${alias};`);
     }
     lines.push('  }');
   }
 }
 
 lines.push('}', '');
-writeFileSync(resolve(CWD, OUTPUT_FILE), lines.join('\n'));
-console.log(`\n✅ Generated ${OUTPUT_FILE}`);
-console.log(`   Plugins: ${plugins.length}, Routes: ${routeAttrs.length}, Dialogs: ${dialogAttrs.length}, Controls: ${controlAttrs.length}`);
+writeFileSync(resolve(CWD, outputFile), lines.join('\n'));
+console.log(`\n✅ ${outputFile}`);
