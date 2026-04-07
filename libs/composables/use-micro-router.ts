@@ -171,11 +171,27 @@ export function useGlobalMicroRouter(
   });
 
   // Cross-concern: navigation → audio (BGM switches on path change)
-  // immediate: true → plays default BGM on mount (Howler queues if autoplay blocked)
   if (audio) {
+    let audioStarted = false;
+
     watch(navigation.activePath, (path) => {
       void audio.updateBackgroundMusic(path, navigation.routes);
-    }, { immediate: true });
+    });
+
+    // Browser autoplay policy blocks audio before user gesture.
+    // Start BGM on first user interaction, then remove listener.
+    const startAudioOnInteraction = () => {
+      if (audioStarted) return;
+      audioStarted = true;
+      void audio.updateBackgroundMusic(
+        navigation.activePath.value,
+        navigation.routes,
+      );
+      document.removeEventListener('click', startAudioOnInteraction);
+      document.removeEventListener('touchstart', startAudioOnInteraction);
+    };
+    document.addEventListener('click', startAudioOnInteraction, { once: true });
+    document.addEventListener('touchstart', startAudioOnInteraction, { once: true });
   }
 
   // Lifecycle
