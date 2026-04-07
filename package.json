@@ -88,6 +88,6 @@
     "gen:types": "bun run scripts/gen-attrs-types.ts",
     "test": "bun test",
     "dev:example": "vite --config examples/vite.config.ts examples",
-    "prepublishOnly": "bun run build"
+    "prepublishOnly": "bun run typecheck && bun test && bun run build"
   }
 }

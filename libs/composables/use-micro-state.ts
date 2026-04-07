@@ -18,7 +18,7 @@ import { MICRO_ATTRS_READ_KEY, MICRO_ATTRS_WRITE_KEY } from '../core/constants';
  *
  * This means: `meta.value?.title` ✅ (not `meta?.value?.title`)
  */
-type StateRefs<T extends object> = {
+export type StateRefs<T extends object> = {
   [K in keyof T]-?: Ref<T[K]>;
 };
 

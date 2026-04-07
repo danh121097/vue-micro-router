@@ -80,6 +80,7 @@ export {
 } from './composables/use-micro-router';
 export type { TypedMicroRouterStore, PluginTypedMicroRouterStore } from './composables/use-micro-router';
 export { useMicroState } from './composables/use-micro-state';
+export type { StateRefs } from './composables/use-micro-state';
 export { useRouteLifecycle } from './composables/navigation/use-route-lifecycle';
 export type { RouteLifecycleHooks } from './composables/navigation/use-route-lifecycle';
 export { useDialogLifecycle } from './composables/dialog/use-dialog-lifecycle';

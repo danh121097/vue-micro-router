@@ -32,7 +32,10 @@ import type {
   PluginTypedOpenDialog,
   PluginTypedCloseDialog,
   PluginTypedToggleControl,
-  ResolvedMicroRouterStore
+  ResolvedMicroRouterStore,
+  RegisteredRouteAttrs,
+  RegisteredDialogAttrs,
+  RegisteredControlAttrs
 } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './control/use-control-manager';
@@ -193,12 +196,12 @@ export type PluginTypedMicroRouterStore<T> = Omit<
   MicroRouterStore,
   'push' | 'stepWisePush' | 'stepWiseBack' | 'openDialog' | 'closeDialog' | 'toggleControl'
 > & {
-  push: PluginTypedPush<ExtractRoutePaths<T>>;
-  stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<T>>;
+  push: PluginTypedPush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
+  stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
   stepWiseBack: PluginTypedStepWiseBack;
-  openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>>;
+  openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>, RegisteredDialogAttrs>;
   closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<T>>;
-  toggleControl: PluginTypedToggleControl<ExtractControlNames<T>>;
+  toggleControl: PluginTypedToggleControl<ExtractControlNames<T>, RegisteredControlAttrs>;
 };
 
 export interface UseMicroRouterOptions {
