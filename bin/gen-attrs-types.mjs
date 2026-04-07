@@ -344,7 +344,7 @@ function generate() {
   try {
     existing = readFileSync(outPath, 'utf-8');
   } catch {
-    console.error('error', error);
+    // File doesn't exist yet — first run
   }
   if (existing === newContent) {
     console.log(`✅ ${outputFile} (unchanged)`);
