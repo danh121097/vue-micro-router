@@ -15,6 +15,8 @@ import { delay } from '../utils/timer-manager';
 export interface AudioManagerConfig {
   /** Volume ref (0-100). Defaults to 100. */
   volumeRef?: Ref<number>;
+  /** Default BGM track name — played on mount and used as fallback. Defaults to 'default'. */
+  defaultBgm?: string;
   /** Resolve a sound name to a full URL. Defaults to identity (name returned as-is). */
   urlResolver?: (name: string) => string;
   /** Custom audio adapter. Defaults to HowlerAdapter (requires howler peer dep). */
@@ -36,15 +38,17 @@ export function useAudioManager(
   config?: AudioManagerConfig
 ): AudioManagerState {
   let isVisibilityChange = false;
-  let previousSoundSrc = 'default';
+  const defaultBgm = config?.defaultBgm ?? '';
+  let previousSoundSrc = defaultBgm;
 
   const adapter: AudioAdapter = config?.adapter ?? new HowlerAdapter();
-  const soundSrc = ref<string>('default');
+  const soundSrc = ref<string>(defaultBgm);
   const resolveUrl = config?.urlResolver ?? ((name: string) => name);
   const volume = computed(() => (config?.volumeRef?.value ?? 100) / 100);
 
   async function playSound(src: string, loop = false) {
     try {
+      if (!config?.defaultBgm) return;
       if (adapter.isPlaying() && soundSrc.value === src) return;
 
       previousSoundSrc = soundSrc.value;

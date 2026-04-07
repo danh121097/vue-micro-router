@@ -20,6 +20,7 @@ import {
 
 import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY } from '../core/constants';
 import type { MicroRouterConfig, MicroRouterStore } from '../core/types';
+import { useAudioManager } from './use-audio-manager';
 import type {
   RouteMap,
   TypedPush,
@@ -75,6 +76,15 @@ export function useGlobalMicroRouter(
     tracker
   );
 
+  // Audio (opt-in — only initialized when volumeRef is provided)
+  const audio = config.volumeRef
+    ? useAudioManager({
+        volumeRef: config.volumeRef,
+        defaultBgm: config.defaultBgm,
+        urlResolver: config.audioUrlResolver,
+      })
+    : null;
+
   const store: MicroRouterStore = {
     // Navigation
     activePath: navigation.activePath,
@@ -129,7 +139,16 @@ export function useGlobalMicroRouter(
 
     // Serialization
     serialize: () => serializeState(store),
-    restore: (state) => restoreState(store, state)
+    restore: (state) => restoreState(store, state),
+
+    // Audio (conditional — only if volumeRef provided in config)
+    ...(audio
+      ? {
+          playSound: audio.playSound,
+          stopSound: audio.stopSound,
+          updateBackgroundMusic: audio.updateBackgroundMusic
+        }
+      : {})
   };
 
   // Cross-concern: navigation → controls (gui leave/enter on page change)
@@ -151,6 +170,13 @@ export function useGlobalMicroRouter(
     }
   });
 
+  // Cross-concern: navigation → audio (BGM switches on path change)
+  if (audio) {
+    watch(navigation.activePath, (path) => {
+      void audio.updateBackgroundMusic(path, navigation.routes);
+    });
+  }
+
   // Lifecycle
   onMounted(async () => {
     await nextTick();
@@ -160,6 +186,7 @@ export function useGlobalMicroRouter(
       undefined,
       navigation.activePath.value
     );
+    if (audio) addEventListener('visibilitychange', audio.handleVisibilityChange);
     // Initialize devtools (no-ops in production or when @vue/devtools-api not installed)
     setupDevtoolsPlugin(store);
   });
@@ -169,6 +196,10 @@ export function useGlobalMicroRouter(
     navigation.cleanup();
     dialogs.cleanup();
     controls.cleanup();
+    if (audio) {
+      removeEventListener('visibilitychange', audio.handleVisibilityChange);
+      audio.cleanup();
+    }
   });
 
   provide(MICRO_ROUTER_KEY, store);

@@ -64,6 +64,8 @@ export interface NavigationState {
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
   /** Manually preload an async route component */
   preloadRoute: (segment: string) => Promise<void>;
+  /** Registered route definitions — used internally by audio manager for BGM lookup */
+  routes: Map<string, MicroRoute>;
   /** Navigation history (only populated when config.history.enabled) */
   history?: NavigationHistory;
   cleanup: () => void;
@@ -419,6 +421,7 @@ export function useNavigation(
     updateRouteAttrs,
     getRouteAttrs,
     preloadRoute: registry.preloadRoute,
+    routes: registry.routes,
     history: navHistory,
     cleanup: timers.cleanup
   };

@@ -158,8 +158,12 @@ export interface MicroRouterConfig {
   };
   /** Analytics hooks for page/dialog/control enter/leave events */
   tracker?: PageTrackerHooks;
-  /** Reactive volume ref (0-100) for audio manager. Only used with vue-micro-router/audio */
+  /** Reactive volume ref (0-100) for audio manager. Enables built-in BGM when provided. */
   volumeRef?: Ref<number>;
+  /** Default BGM track name — used as initial track and fallback when route has no bgm field */
+  defaultBgm?: string;
+  /** Resolve audio name to URL. Defaults to identity. Example: (name) => `/audios/${name}.mp3` */
+  audioUrlResolver?: (name: string) => string;
 }
 
 // ── Serialized State ─────────────────────────────────────────────────────────
