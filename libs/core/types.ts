@@ -83,6 +83,8 @@ export interface MicroDialog {
   transition?: TransitionType;
   /** If true (default), dialog has transparent background and no shadow */
   seamless?: boolean;
+  /** Prime mobile keyboard on open — set true for dialogs with autofocus inputs */
+  focusInput?: boolean;
   /** Internal: incremented on each open to force component remount */
   componentKey?: number;
 }

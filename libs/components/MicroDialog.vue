@@ -56,10 +56,19 @@ function handleCancel(e: Event) {
 
 function handleBackdropClick(e: MouseEvent) {
   if (props.dialog.persistent) return;
-  // Only close if clicking the dialog backdrop itself, not content
   if (e.target === dialogRef.value) {
     emits('close', props.dialog.path);
   }
+}
+
+/** Prime mobile keyboard by briefly focusing a hidden input inside the dialog */
+function primeMobileKeyboard() {
+  if (!props.dialog.focusInput || !dialogRef.value) return;
+  const input = document.createElement('input');
+  input.style.cssText = 'position:fixed;opacity:0;height:0;width:0;top:-100px;';
+  dialogRef.value.appendChild(input);
+  input.focus();
+  setTimeout(() => input.remove(), 50);
 }
 
 // Open/close the native dialog based on activated state
@@ -70,17 +79,19 @@ watch(
       if (!dialogRef.value) return;
       if (activated && !dialogRef.value.open) {
         dialogRef.value.showModal();
+        primeMobileKeyboard();
       } else if (!activated && dialogRef.value.open) {
         dialogRef.value.close();
       }
     });
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 onMounted(() => {
   if (props.dialog.activated && dialogRef.value && !dialogRef.value.open) {
     dialogRef.value.showModal();
+    primeMobileKeyboard();
   }
 });
 </script>
