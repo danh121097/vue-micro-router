@@ -20,33 +20,43 @@
   animation: _dialog-fade-out 0.2s ease-in forwards;
 }
 
+/* Dialog always fills viewport (like Reka UI overlay). Content handles positioning. */
 .micro-dialog__content {
   position: relative;
 }
 
-/* ── Positions ───────────────────────────────────── */
+/* ── Positions — applied to content wrapper ───────── */
 .micro-dialog--standard {
-  margin: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .micro-dialog--top {
-  margin: 0 auto auto auto;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .micro-dialog--bottom {
-  margin: auto auto 0 auto;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
 }
 
 .micro-dialog--left {
-  margin: auto auto auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .micro-dialog--right {
-  margin: auto 0 auto auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 /* ── Fullscreen ──────────────────────────────────── */
-/* Sizing handled via inline styles (overrides UA top-layer styles) */
 .micro-dialog--fullscreen {
   border-radius: 0;
   overflow: hidden;
