@@ -48,7 +48,6 @@ export function useAudioManager(
 
   async function playSound(src: string, loop = false) {
     try {
-      if (!config?.defaultBgm) return;
       if (adapter.isPlaying() && soundSrc.value === src) return;
 
       previousSoundSrc = soundSrc.value;

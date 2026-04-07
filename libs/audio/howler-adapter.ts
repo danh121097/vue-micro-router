@@ -23,7 +23,10 @@ export class HowlerAdapter implements AudioAdapter {
     return this.howlCtorPromise;
   }
 
-  async play(src: string, options: { loop?: boolean; volume?: number } = {}): Promise<void> {
+  async play(
+    src: string,
+    options: { loop?: boolean; volume?: number } = {}
+  ): Promise<void> {
     this.stop();
     const Howl = await this.getHowlCtor();
     this.sound = new Howl({

@@ -48,10 +48,20 @@ describe('useAudioManager', () => {
     // No error
   });
 
-  test('playSound fails gracefully without howler', async () => {
+  test('playSound fails gracefully with broken adapter', async () => {
     const errorSpy = mock(() => {});
     console.error = errorSpy;
-    const am = useAudioManager();
+    const brokenAdapter = {
+      play: () => { throw new Error('no audio'); },
+      stop: () => {},
+      pause: () => {},
+      resume: () => {},
+      fade: () => {},
+      isPlaying: () => false,
+      state: () => 'unloaded' as const,
+      cleanup: () => {},
+    };
+    const am = useAudioManager({ adapter: brokenAdapter });
     await am.playSound('test');
     expect(errorSpy).toHaveBeenCalled();
   });
