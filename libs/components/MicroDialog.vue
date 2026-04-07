@@ -128,6 +128,8 @@ onMounted(() => {
         margin: '0',
         padding: '0',
         inset: '0',
+        border: 'none',
+        outline: 'none',
       }"
       @cancel="handleCancel"
       @click="handleBackdropClick"
