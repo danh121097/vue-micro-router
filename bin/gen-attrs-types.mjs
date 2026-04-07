@@ -296,13 +296,10 @@ if (watchMode) {
     }, 300);
   };
 
-  const outputBasename = outputFile.split('/').pop();
-
   fsWatch(SCAN_PATH, { recursive: true }, (event, filename) => {
     if (!filename) return;
-    // Skip output file to prevent infinite loop
-    if (filename.endsWith(outputBasename)) return;
-    const ext = extname(filename);
-    if (ext === '.vue' || ext === '.ts') regenerate();
+    // Skip .d.ts files (output file, auto-imports.d.ts, etc.) — only watch source
+    if (filename.endsWith('.d.ts')) return;
+    if (filename.endsWith('.vue') || filename.endsWith('.ts')) regenerate();
   });
 }
