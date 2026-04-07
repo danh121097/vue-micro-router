@@ -65,7 +65,8 @@ store.push('profile');               // OK
 store.push('typo');                  // TS Error
 store.openDialog('confirm');         // OK
 store.toggleControl('main_hud', true); // OK
-</pre>
+</pre
+      >
     </div>
 
     <div class="info">
