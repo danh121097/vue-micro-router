@@ -198,19 +198,19 @@ export type ResolvedMicroRouterStore =
         | 'activeDialog' | 'fromDialog' | 'toDialog'
         | 'currentControl'
       > & {
-        push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
-        stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
+        push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs, RegisteredRouteAttrs>;
+        stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs, RegisteredRouteAttrs>;
         stepWiseBack: PluginTypedStepWiseBack;
-        openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin>, RegisteredDialogAttrs>;
-        closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<RegisteredPlugin>>;
-        toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin>, RegisteredControlAttrs>;
-        activePage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
-        fromPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
-        toPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
-        activeDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
-        fromDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
-        toDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
-        currentControl: import('vue').ComputedRef<ExtractControlNames<RegisteredPlugin>>;
+        openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs, RegisteredDialogAttrs>;
+        closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs>;
+        toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin> | keyof RegisteredControlAttrs, RegisteredControlAttrs>;
+        activePage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs>;
+        fromPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs>;
+        toPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs>;
+        activeDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs | ''>;
+        fromDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs | ''>;
+        toDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs | ''>;
+        currentControl: import('vue').ComputedRef<ExtractControlNames<RegisteredPlugin> | keyof RegisteredControlAttrs>;
       }
     : HasRegisteredRouteMap extends true
       ? Omit<import('./types').MicroRouterStore, 'push'> & {
