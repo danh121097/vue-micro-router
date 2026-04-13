@@ -89,10 +89,14 @@ export class HowlerAdapter implements AudioAdapter {
 
   /** Full teardown — unload audio buffer, release memory */
   destroy(): void {
-    if (this.sound) {
-      this.sound.stop();
-      this.sound.off();
-      this.sound.unload();
+    try {
+      if (this.sound) {
+        this.sound.stop();
+        this.sound.off();
+        this.sound.unload();
+        this.sound = null;
+      }
+    } catch {
       this.sound = null;
     }
   }

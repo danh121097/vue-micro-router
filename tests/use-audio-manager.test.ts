@@ -8,6 +8,8 @@ describe('useAudioManager', () => {
     const am = useAudioManager();
     expect(am.playSound).toBeFunction();
     expect(am.stopSound).toBeFunction();
+    expect(am.pauseSound).toBeFunction();
+    expect(am.resumeSound).toBeFunction();
     expect(am.updateBackgroundMusic).toBeFunction();
     expect(am.handleVisibilityChange).toBeFunction();
     expect(am.cleanup).toBeFunction();
@@ -53,6 +55,7 @@ describe('useAudioManager', () => {
     const brokenAdapter = {
       play: () => { throw new Error('no audio'); },
       stop: () => {},
+      destroy: () => {},
       pause: () => {},
       resume: () => {},
       fade: () => {},
@@ -86,6 +89,63 @@ describe('useAudioManager', () => {
     console.error = errorSpy;
     await am.playSound('test');
     am.stopSound();
+  });
+
+  test('pauseSound does not throw without playing', () => {
+    const am = useAudioManager();
+    am.pauseSound();
+  });
+
+  test('resumeSound does not throw without playing', () => {
+    const am = useAudioManager();
+    am.resumeSound();
+  });
+
+  test('resumeSound falls back to playSound when no instance loaded', async () => {
+    const errorSpy = mock(() => {});
+    console.error = errorSpy;
+    const am = useAudioManager({ defaultBgm: '/audio/bgm.mp3' });
+    am.resumeSound();
+  });
+
+  test('pauseSound then resumeSound with mock adapter', () => {
+    let paused = false;
+    let resumed = false;
+    const mockAdapter = {
+      play: async () => {},
+      playSync: () => {},
+      stop: () => {},
+      destroy: () => {},
+      pause: () => { paused = true; },
+      resume: () => { resumed = true; },
+      fade: () => {},
+      isPlaying: () => !paused,
+      state: () => 'loaded' as const,
+      cleanup: () => {},
+    };
+    const am = useAudioManager({ adapter: mockAdapter });
+    am.pauseSound();
+    expect(paused).toBe(true);
+    am.resumeSound();
+    expect(resumed).toBe(true);
+  });
+
+  test('playSound resolves "default" to defaultBgm', async () => {
+    let playedSrc = '';
+    const mockAdapter = {
+      play: async (src: string) => { playedSrc = src; },
+      stop: () => {},
+      destroy: () => {},
+      pause: () => {},
+      resume: () => {},
+      fade: () => {},
+      isPlaying: () => false,
+      state: () => 'unloaded' as const,
+      cleanup: () => {},
+    };
+    const am = useAudioManager({ adapter: mockAdapter, defaultBgm: '/audio/bgm.mp3' });
+    await am.playSound('default');
+    expect(playedSrc).toBe('/audio/bgm.mp3');
   });
 
   test('handleVisibilityChange with no document (SSR)', () => {
