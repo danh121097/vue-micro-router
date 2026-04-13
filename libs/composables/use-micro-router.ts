@@ -15,7 +15,8 @@ import {
   onBeforeUnmount,
   onMounted,
   provide,
-  watch
+  watch,
+  type ComputedRef
 } from 'vue';
 
 import { MICRO_ROUTER_KEY, MICRO_ROUTER_ROOT_KEY } from '../core/constants';
@@ -242,7 +243,11 @@ export type TypedMicroRouterStore<T extends RouteMap> = Omit<
  */
 export type PluginTypedMicroRouterStore<T> = Omit<
   MicroRouterStore,
-  'push' | 'stepWisePush' | 'stepWiseBack' | 'openDialog' | 'closeDialog' | 'toggleControl'
+  | 'push' | 'stepWisePush' | 'stepWiseBack'
+  | 'openDialog' | 'closeDialog' | 'toggleControl'
+  | 'activePage' | 'fromPage' | 'toPage'
+  | 'activeDialog' | 'fromDialog' | 'toDialog'
+  | 'currentControl'
 > & {
   push: PluginTypedPush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
   stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
@@ -250,6 +255,13 @@ export type PluginTypedMicroRouterStore<T> = Omit<
   openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>, RegisteredDialogAttrs>;
   closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<T>>;
   toggleControl: PluginTypedToggleControl<ExtractControlNames<T>, RegisteredControlAttrs>;
+  activePage: ComputedRef<ExtractRoutePaths<T>>;
+  fromPage: ComputedRef<ExtractRoutePaths<T>>;
+  toPage: ComputedRef<ExtractRoutePaths<T>>;
+  activeDialog: ComputedRef<ExtractDialogPaths<T> | ''>;
+  fromDialog: ComputedRef<ExtractDialogPaths<T> | ''>;
+  toDialog: ComputedRef<ExtractDialogPaths<T> | ''>;
+  currentControl: ComputedRef<ExtractControlNames<T>>;
 };
 
 export interface UseMicroRouterOptions {

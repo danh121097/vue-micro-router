@@ -192,7 +192,11 @@ export type ResolvedMicroRouterStore =
   HasRegisteredPlugin extends true
     ? Omit<
         import('./types').MicroRouterStore,
-        'push' | 'stepWisePush' | 'stepWiseBack' | 'openDialog' | 'closeDialog' | 'toggleControl'
+        | 'push' | 'stepWisePush' | 'stepWiseBack'
+        | 'openDialog' | 'closeDialog' | 'toggleControl'
+        | 'activePage' | 'fromPage' | 'toPage'
+        | 'activeDialog' | 'fromDialog' | 'toDialog'
+        | 'currentControl'
       > & {
         push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
         stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<RegisteredPlugin>, RegisteredRouteAttrs>;
@@ -200,6 +204,13 @@ export type ResolvedMicroRouterStore =
         openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin>, RegisteredDialogAttrs>;
         closeDialog: PluginTypedCloseDialog<ExtractDialogPaths<RegisteredPlugin>>;
         toggleControl: PluginTypedToggleControl<ExtractControlNames<RegisteredPlugin>, RegisteredControlAttrs>;
+        activePage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
+        fromPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
+        toPage: import('vue').ComputedRef<ExtractRoutePaths<RegisteredPlugin>>;
+        activeDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
+        fromDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
+        toDialog: import('vue').ComputedRef<ExtractDialogPaths<RegisteredPlugin> | ''>;
+        currentControl: import('vue').ComputedRef<ExtractControlNames<RegisteredPlugin>>;
       }
     : HasRegisteredRouteMap extends true
       ? Omit<import('./types').MicroRouterStore, 'push'> & {
