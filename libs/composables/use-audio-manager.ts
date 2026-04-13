@@ -50,13 +50,15 @@ export function useAudioManager(
 
   async function playSound(src: string, loop = false) {
     try {
-      if (adapter.isPlaying() && soundSrc.value === src) return;
+      const resolvedSrc = src === 'default' ? defaultBgm : src;
+      if (!resolvedSrc) return;
+      if (adapter.isPlaying() && soundSrc.value === resolvedSrc) return;
 
       previousSoundSrc = soundSrc.value;
-      soundSrc.value = src;
+      soundSrc.value = resolvedSrc;
       adapter.stop();
 
-      await adapter.play(src, { loop, volume: volume.value });
+      await adapter.play(resolvedSrc, { loop: src === 'default' ? true : loop, volume: volume.value });
     } catch (error) {
       console.error('Sound playback failed:', error);
       adapter.stop();
@@ -66,14 +68,17 @@ export function useAudioManager(
   /** Synchronous play — no async gaps, safe in user gesture context for autoplay */
   function playSoundSync(src: string, loop = false) {
     try {
-      if (adapter.isPlaying() && soundSrc.value === src) return;
+      const resolvedSrc = src === 'default' ? defaultBgm : src;
+      if (!resolvedSrc) return;
+      if (adapter.isPlaying() && soundSrc.value === resolvedSrc) return;
       previousSoundSrc = soundSrc.value;
-      soundSrc.value = src;
+      soundSrc.value = resolvedSrc;
       adapter.stop();
+      const resolvedLoop = src === 'default' ? true : loop;
       if (adapter.playSync) {
-        adapter.playSync(src, { loop, volume: volume.value });
+        adapter.playSync(resolvedSrc, { loop: resolvedLoop, volume: volume.value });
       } else {
-        void adapter.play(src, { loop, volume: volume.value });
+        void adapter.play(resolvedSrc, { loop: resolvedLoop, volume: volume.value });
       }
     } catch (error) {
       console.error('Sound playback failed:', error);
