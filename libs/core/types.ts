@@ -307,5 +307,7 @@ export interface MicroRouterStore {
   // Audio (only present when audio sub-path is used)
   playSound?: (soundSrc: string, loop?: boolean) => Promise<void>;
   stopSound?: () => void;
+  pauseSound?: () => void;
+  resumeSound?: () => void;
   updateBackgroundMusic?: (route: string) => Promise<void>;
 }

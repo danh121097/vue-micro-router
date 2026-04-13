@@ -18,15 +18,19 @@ export class HowlerAdapter implements AudioAdapter {
   constructor() {
     // Preload Howler.js eagerly so play() is synchronous (no async gap = no autoplay block)
     import('howler')
-      .then((mod) => { this.HowlCtor = mod.Howl; })
-      .catch(() => { /* howler not installed — play() will error */ });
+      .then((mod) => {
+        this.HowlCtor = mod.Howl;
+      })
+      .catch(() => {
+        /* howler not installed — play() will error */
+      });
   }
 
   async play(
     src: string,
     options: { loop?: boolean; volume?: number } = {}
   ): Promise<void> {
-    this.stop();
+    this.destroy();
     // Wait for preload if not ready yet (first call only)
     if (!this.HowlCtor) {
       const mod = await import('howler');
@@ -54,35 +58,41 @@ export class HowlerAdapter implements AudioAdapter {
             this.sound?.play();
           });
           resolve();
-        },
+        }
       });
       this.sound.play();
     });
   }
 
   /** Fully synchronous play — uses preloaded HowlCtor. No-op if not preloaded yet. */
-  playSync(src: string, options: { loop?: boolean; volume?: number } = {}): void {
+  playSync(
+    src: string,
+    options: { loop?: boolean; volume?: number } = {}
+  ): void {
     if (!this.HowlCtor) return; // not preloaded yet — first gesture missed
-    this.stop();
+    this.destroy();
     this.sound = new this.HowlCtor({
       src: [src],
       autoplay: true,
       loop: options.loop ?? false,
-      volume: 0,
+      volume: 0
     });
     this.sound.play();
     this.sound.fade(0, options.volume ?? 1, 200);
   }
 
   stop(): void {
-    try {
-      if (this.sound) {
-        this.sound.stop();
-        this.sound.off();
-        this.sound.unload();
-        this.sound = null;
-      }
-    } catch {
+    if (this.sound) {
+      this.sound.stop();
+    }
+  }
+
+  /** Full teardown — unload audio buffer, release memory */
+  destroy(): void {
+    if (this.sound) {
+      this.sound.stop();
+      this.sound.off();
+      this.sound.unload();
       this.sound = null;
     }
   }
@@ -115,6 +125,6 @@ export class HowlerAdapter implements AudioAdapter {
   }
 
   cleanup(): void {
-    this.stop();
+    this.destroy();
   }
 }

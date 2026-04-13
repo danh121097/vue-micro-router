@@ -26,6 +26,10 @@ export interface AudioManagerState {
   /** Synchronous play — no async gaps, safe in user gesture context for autoplay policy */
   playSoundSync: (soundSrc: string, loop?: boolean) => void;
   stopSound: () => void;
+  /** Pause BGM without destroying the Howl instance — resumeSound() to continue */
+  pauseSound: () => void;
+  /** Resume paused BGM — safe to call from non-gesture context (no new Howl created) */
+  resumeSound: () => void;
   updateBackgroundMusic: (
     route: string,
     routes?: Map<string, MicroRoute>
@@ -56,12 +60,11 @@ export function useAudioManager(
 
       previousSoundSrc = soundSrc.value;
       soundSrc.value = resolvedSrc;
-      adapter.stop();
 
       await adapter.play(resolvedSrc, { loop: src === 'default' ? true : loop, volume: volume.value });
     } catch (error) {
       console.error('Sound playback failed:', error);
-      adapter.stop();
+      adapter.destroy();
     }
   }
 
@@ -73,7 +76,6 @@ export function useAudioManager(
       if (adapter.isPlaying() && soundSrc.value === resolvedSrc) return;
       previousSoundSrc = soundSrc.value;
       soundSrc.value = resolvedSrc;
-      adapter.stop();
       const resolvedLoop = src === 'default' ? true : loop;
       if (adapter.playSync) {
         adapter.playSync(resolvedSrc, { loop: resolvedLoop, volume: volume.value });
@@ -88,6 +90,18 @@ export function useAudioManager(
 
   function stopSound() {
     adapter.stop();
+  }
+
+  function pauseSound() {
+    adapter.pause();
+  }
+
+  function resumeSound() {
+    if (adapter.state() === 'loaded') {
+      adapter.resume();
+    } else if (defaultBgm) {
+      void playSound(defaultBgm, true);
+    }
   }
 
   async function updateBackgroundMusic(
@@ -142,6 +156,8 @@ export function useAudioManager(
     playSound,
     playSoundSync,
     stopSound,
+    pauseSound,
+    resumeSound,
     updateBackgroundMusic,
     isStarted: () => adapter.isPlaying() || adapter.state() === 'loaded',
     handleVisibilityChange,

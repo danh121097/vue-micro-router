@@ -155,6 +155,8 @@ export function useGlobalMicroRouter(
       ? {
           playSound: audio.playSound,
           stopSound: audio.stopSound,
+          pauseSound: audio.pauseSound,
+          resumeSound: audio.resumeSound,
           updateBackgroundMusic: audio.updateBackgroundMusic
         }
       : {})
