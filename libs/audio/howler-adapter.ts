@@ -32,14 +32,32 @@ export class HowlerAdapter implements AudioAdapter {
       const mod = await import('howler');
       this.HowlCtor = mod.Howl;
     }
-    this.sound = new this.HowlCtor({
-      src: [src],
-      autoplay: true,
-      loop: options.loop ?? false,
-      volume: 0,
+    const Ctor = this.HowlCtor;
+    const targetVolume = options.volume ?? 1;
+
+    return new Promise<void>((resolve, reject) => {
+      this.sound = new Ctor({
+        src: [src],
+        autoplay: false,
+        loop: options.loop ?? false,
+        volume: 0,
+        onplay: () => {
+          this.sound?.fade(0, targetVolume, 200);
+          resolve();
+        },
+        onloaderror: (_id: number, err: unknown) => {
+          reject(new Error(`Failed to load audio: ${err}`));
+        },
+        onplayerror: () => {
+          // Retry once — handles browser autoplay policy unlock
+          this.sound?.once('unlock', () => {
+            this.sound?.play();
+          });
+          resolve();
+        },
+      });
+      this.sound.play();
     });
-    this.sound.play();
-    this.sound.fade(0, options.volume ?? 1, 200);
   }
 
   /** Fully synchronous play — uses preloaded HowlCtor. No-op if not preloaded yet. */
