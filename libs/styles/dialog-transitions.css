@@ -74,9 +74,9 @@
   box-shadow: none;
 }
 
-.micro-dialog--seamless::backdrop {
-  background: transparent;
-  animation: none;
+.micro-dialog.micro-dialog--seamless::backdrop {
+  background: transparent !important;
+  animation: none !important;
 }
 
 
