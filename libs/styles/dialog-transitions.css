@@ -68,10 +68,15 @@
   overflow: hidden;
 }
 
-/* ── Seamless (no background/shadow) ─────────────── */
+/* ── Seamless (no background/shadow/backdrop) ────── */
 .micro-dialog--seamless {
   background: transparent;
   box-shadow: none;
+}
+
+.micro-dialog--seamless::backdrop {
+  background: transparent;
+  animation: none;
 }
 
 
