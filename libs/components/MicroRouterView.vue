@@ -30,6 +30,7 @@ const {
   resolveControls,
   fromPath,
   toPath,
+  isNavigating,
   closeDialog
 } = store;
 
@@ -63,7 +64,9 @@ const transitionDuration = computed(() => {
   return activeTransition.value === 'fade' ? 300 : 500;
 });
 
-const useCss = computed(() => hasSharedSegments.value && activeTransition.value !== 'none');
+const useCss = computed(
+  () => hasSharedSegments.value && activeTransition.value !== 'none'
+);
 
 // Gesture navigation (swipe-back from left edge)
 if (props.config.gesture?.enabled) {
@@ -82,14 +85,15 @@ if (props.config.gesture?.enabled) {
       :key="route.key || route.path"
       :route-path="route.path"
       :class="{
-        deactive: resolveRoutes.length > 1 && i !== resolveRoutes.length - 1
+        deactivate: resolveRoutes.length > 1 && i !== resolveRoutes.length - 1,
+        'micro-router--navigating': isNavigating
       }"
       :style="{
         transition: useCss
           ? `transform ${transitionDuration}ms cubic-bezier(0.65, 0, 0.35, 1), opacity ${transitionDuration}ms ease`
           : 'none',
         zIndex: i,
-        '--mr-page-height': nested ? '100%' : '100dvh',
+        '--mr-page-height': nested ? '100%' : '100dvh'
       }"
     >
       <component

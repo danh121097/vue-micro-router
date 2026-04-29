@@ -93,6 +93,7 @@ export function useGlobalMicroRouter(
     activePage: navigation.activePage,
     fromPage: navigation.fromPage,
     toPage: navigation.toPage,
+    isNavigating: navigation.isNavigating,
     resolveRoutes: navigation.resolveRoutes,
     push: async (destination, props?) => {
       await navigation.push(destination, props);

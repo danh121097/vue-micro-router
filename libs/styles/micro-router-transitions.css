@@ -23,11 +23,11 @@
   z-index: 1;
 }
 
-.route-page.deactive {
+.route-page.deactivate {
   transform: translateX(-20%);
 }
 
-.route-page.deactive::before {
+.route-page.deactivate::before {
   opacity: 1;
 }
 
@@ -59,6 +59,12 @@
   inset: 0;
   z-index: 20;
   pointer-events: none;
+}
+
+/* ── Navigation Lock — block page interactions during transition ─ */
+.micro-router--navigating,
+.micro-router--navigating * {
+  pointer-events: none !important;
 }
 
 /* ── GUI Layer ───────────────────────────────────── */

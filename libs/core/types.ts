@@ -225,6 +225,8 @@ export interface MicroRouterStore {
   activePage: ComputedRef<string>;
   fromPage: ComputedRef<string>;
   toPage: ComputedRef<string>;
+  /** True while a navigation animation (push/stepWisePush/stepWiseBack) is in progress */
+  isNavigating: ComputedRef<boolean>;
   resolveRoutes: ComputedRef<MicroRoute[]>;
   /**
    * Navigate to a destination. Guarded against rapid double-clicks.

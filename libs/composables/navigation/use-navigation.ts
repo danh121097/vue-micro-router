@@ -14,6 +14,7 @@ import {
   computed,
   nextTick,
   reactive,
+  ref,
   shallowReactive,
   type AsyncComponentLoader,
   type ComputedRef
@@ -48,6 +49,8 @@ export interface NavigationState {
   activePage: ComputedRef<string>;
   fromPage: ComputedRef<string>;
   toPage: ComputedRef<string>;
+  /** True while a navigation animation (push/stepWisePush/stepWiseBack) is in progress */
+  isNavigating: ComputedRef<boolean>;
   resolveRoutes: ComputedRef<MicroRoute[]>;
   push: (
     destination: string | number,
@@ -82,7 +85,7 @@ export function useNavigation(
   const timers = createTimerManager();
   const registry = createRouteRegistry();
 
-  let isNavigating = false;
+  const isNavigating = ref(false);
 
   const state = reactive({
     activePath: defaultPath,
@@ -328,8 +331,8 @@ export function useNavigation(
     destination: string | number,
     props?: Record<string, unknown>
   ) {
-    if (isNavigating) return;
-    isNavigating = true;
+    if (isNavigating.value) return;
+    isNavigating.value = true;
     try {
       // Run guard pipeline before any state mutation
       const hasGlobalGuards = (guardConfig.beforeEach?.length ?? 0) > 0;
@@ -340,7 +343,7 @@ export function useNavigation(
         const fromPath = normalizePath(state.activePath);
         const allowed = await executeGuardPipeline(targetPath, fromPath, guardConfig, guardContext);
         if (!allowed) {
-          isNavigating = false;
+          isNavigating.value = false;
           return;
         }
       }
@@ -359,10 +362,10 @@ export function useNavigation(
       registry.preloadAdjacent(parsePathSegments(state.activePath));
 
       timers.schedule(() => {
-        isNavigating = false;
+        isNavigating.value = false;
       }, stepDelay);
     } catch (e) {
-      isNavigating = false;
+      isNavigating.value = false;
       throw e;
     }
   }
@@ -398,10 +401,10 @@ export function useNavigation(
     getActivePath: () => state.activePath,
     pushCore,
     runGuards: (to, from) => executeGuardPipeline(to, from, guardConfig, guardContext),
-    scheduleUnlock: () => timers.schedule(() => { isNavigating = false; }, stepDelay),
-    lock: () => { isNavigating = true; },
-    unlock: () => { isNavigating = false; },
-    isLocked: () => isNavigating,
+    scheduleUnlock: () => timers.schedule(() => { isNavigating.value = false; }, stepDelay),
+    lock: () => { isNavigating.value = true; },
+    unlock: () => { isNavigating.value = false; },
+    isLocked: () => isNavigating.value,
     stepDelay
   });
 
@@ -412,6 +415,7 @@ export function useNavigation(
     activePage: computed(() => getLastSegment(state.activePath)),
     fromPage: computed(() => getLastSegment(state.fromPath)),
     toPage: computed(() => getLastSegment(state.toPath)),
+    isNavigating: computed(() => isNavigating.value),
     resolveRoutes,
     push,
     stepWisePush: stepWise.stepWisePush,
