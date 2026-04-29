@@ -47,7 +47,7 @@ const duration = computed(() => {
   return transition.value === 'slide' ? 500 : 300;
 });
 const position = computed(() => props.dialog.position ?? 'standard');
-const seamless = computed(() => props.dialog.seamless ?? true);
+const seamless = computed(() => props.dialog.seamless ?? false);
 const isVisible = computed(
   () => props.dialog.activated || !!props.dialog.closing
 );

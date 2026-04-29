@@ -81,7 +81,7 @@ export interface MicroDialog {
   transitionDuration?: number;
   /** Animation type: 'fade' (pure opacity), 'scale' (pop), 'slide' (page-style) */
   transition?: TransitionType;
-  /** If true (default), dialog has transparent background and no shadow */
+  /** If true, dialog has no backdrop overlay (see-through to app behind). Default: false */
   seamless?: boolean;
   /** Prime mobile keyboard on open — set true for dialogs with autofocus inputs */
   focusInput?: boolean;
