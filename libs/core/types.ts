@@ -79,7 +79,7 @@ export interface MicroDialog {
   position?: DialogPosition;
   /** Custom transition duration in ms. Defaults: slide=500ms, fade/scale=300ms */
   transitionDuration?: number;
-  /** Animation type: 'fade' (scale+fade), 'scale' (pop), 'slide' (page-style) */
+  /** Animation type: 'fade' (pure opacity), 'scale' (pop), 'slide' (page-style) */
   transition?: TransitionType;
   /** If true (default), dialog has transparent background and no shadow */
   seamless?: boolean;

@@ -157,12 +157,12 @@
   }
 }
 
-/* ── Fade (scale+fade) ───────────────────────────── */
+/* ── Fade (pure opacity) ─────────────────────────── */
 .dialog-transition-fade:not(.micro-dialog--closing) {
-  animation: _dialog-scale-in 0.25s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: _dialog-fade-in 0.25s ease-out forwards;
 }
 .dialog-transition-fade.micro-dialog--closing {
-  animation: _dialog-scale-out 0.18s cubic-bezier(0.4, 0, 0.6, 1) forwards;
+  animation: _dialog-fade-out 0.2s ease-in forwards;
 }
 
 /* ── Scale (pop scale+fade) ──────────────────────── */
