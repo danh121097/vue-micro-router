@@ -45,6 +45,7 @@
   position: relative;
   outline: none;
   pointer-events: none;
+  width: 100%;
   max-width: 100%;
   max-height: 100dvh;
   will-change: opacity, transform;
