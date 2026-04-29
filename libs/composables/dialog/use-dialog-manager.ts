@@ -62,8 +62,18 @@ export function useDialogManager(
 
   const resolveDialogs = computed<MicroDialog[]>(() => {
     const result: MicroDialog[] = [];
+    const seen = new Set<string>();
+    // Iterate in open-stack order — last entry = topmost (higher stackIndex → higher z-index)
+    for (const path of state.dialogStack) {
+      const d = state.dialogs.get(path);
+      if (d && (d.activated || d.closing)) {
+        result.push(d);
+        seen.add(path);
+      }
+    }
+    // Include closing dialogs no longer in stack (during exit animation)
     for (const d of state.dialogs.values()) {
-      if (d.activated || d.closing) result.push(d);
+      if (d.closing && !seen.has(d.path)) result.push(d);
     }
     return result;
   });
