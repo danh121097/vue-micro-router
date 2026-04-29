@@ -1,125 +1,91 @@
-/* ── Dialog Base ──────────────────────────────────── */
-.micro-dialog {
-  border: none;
-  padding: 0;
-  max-width: 100%;
-  max-height: 100dvh;
-  width: 100%;
-  background: transparent;
-  color: inherit;
-  overflow: visible;
-  will-change: opacity, transform;
-}
-
-.micro-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.5);
-  animation: _dialog-fade-in 0.3s ease-out forwards;
-}
-
-.micro-dialog--closing::backdrop {
-  animation: _dialog-fade-out 0.2s ease-in forwards;
-}
-
-/* Dialog always fills viewport (like Reka UI overlay). Content handles positioning. */
-.micro-dialog__content {
-  position: relative;
-}
-
-/* ── Positions — applied to content wrapper ───────── */
-.micro-dialog--standard {
+/* ── Portal — full viewport overlay (Quasar-style) ────── */
+.micro-dialog-portal {
+  position: fixed;
+  inset: 0;
   display: flex;
+  pointer-events: auto;
+}
+
+/* ── Positions — applied to portal (centers wrapper) ──── */
+.micro-dialog--standard {
   align-items: center;
   justify-content: center;
 }
-
 .micro-dialog--top {
-  display: flex;
   align-items: flex-start;
   justify-content: center;
 }
-
 .micro-dialog--bottom {
-  display: flex;
   align-items: flex-end;
   justify-content: center;
 }
-
 .micro-dialog--left {
-  display: flex;
   align-items: center;
   justify-content: flex-start;
 }
-
 .micro-dialog--right {
-  display: flex;
   align-items: center;
   justify-content: flex-end;
 }
 
-/* ── Fullscreen ──────────────────────────────────── */
-.micro-dialog--fullscreen {
-  border-radius: 0;
-  overflow: hidden;
+/* ── Backdrop — separate visual layer, fades independently ── */
+.micro-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+  animation: _dialog-fade-in 0.3s ease-out forwards;
+}
+.micro-dialog-backdrop--closing {
+  animation: _dialog-fade-out 0.2s ease-in forwards;
 }
 
-.micro-dialog--fullscreen .micro-dialog__content {
+/* ── Dialog wrapper — relative, lets clicks fall through to portal ──── */
+.micro-dialog {
+  position: relative;
+  outline: none;
+  pointer-events: none;
+  max-width: 100%;
+  max-height: 100dvh;
+  will-change: opacity, transform;
+}
+
+.micro-dialog__content {
+  position: relative;
+  pointer-events: auto;
+}
+
+/* ── Fullscreen ─────────────────────────────────────── */
+.micro-dialog--fullscreen .micro-dialog {
+  width: 100vw;
   height: 100dvh;
+}
+.micro-dialog--fullscreen .micro-dialog__content {
   width: 100%;
+  height: 100dvh;
   overflow: hidden;
 }
 
-/* ── Seamless (no background/shadow/backdrop) ────── */
-.micro-dialog--seamless {
-  background: transparent;
-  box-shadow: none;
+/* ── Closing state — also passes clicks through ─────── */
+.micro-dialog--closing {
+  pointer-events: none;
 }
 
-.micro-dialog.micro-dialog--seamless::backdrop {
-  background: transparent !important;
-  animation: none !important;
-}
-
-
-/* ── Keyframes ───────────────────────────────────── */
-@keyframes _dialog-scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@keyframes _dialog-scale-out {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-}
-
+/* ── Keyframes ──────────────────────────────────────── */
 @keyframes _dialog-fade-in {
   from {
     opacity: 0;
-    transform: none;
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @keyframes _dialog-fade-out {
   from {
     opacity: 1;
-    transform: none;
   }
   to {
     opacity: 0;
-    transform: none;
   }
 }
 
@@ -161,10 +127,7 @@
   }
 }
 
-/* ── Fade (pure opacity, no transform) ───────────── */
-.dialog-transition-fade {
-  transform: none !important;
-}
+/* ── Fade (pure opacity) ────────────────────────────── */
 .dialog-transition-fade:not(.micro-dialog--closing) {
   animation: _dialog-fade-in 0.25s ease-out forwards;
 }
@@ -172,7 +135,7 @@
   animation: _dialog-fade-out 0.2s ease-in forwards;
 }
 
-/* ── Scale (pop scale+fade) ──────────────────────── */
+/* ── Scale (pop) ────────────────────────────────────── */
 .dialog-transition-scale:not(.micro-dialog--closing) {
   animation: _dialog-scale-pop-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -180,7 +143,7 @@
   animation: _dialog-scale-pop-out 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-/* ── Slide (matches page router) ─────────────────── */
+/* ── Slide (matches page router) ────────────────────── */
 .dialog-transition-slide:not(.micro-dialog--closing) {
   animation: _dialog-slide-in var(--dialog-duration, 0.5s)
     cubic-bezier(0.65, 0, 0.35, 1) forwards;

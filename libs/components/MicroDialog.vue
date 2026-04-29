@@ -1,9 +1,13 @@
 <script setup lang="ts">
-/**
- * Headless dialog using native <dialog> element.
- * No dependency — native focus trap, backdrop, escape key handling.
- */
-import { computed, nextTick, onMounted, provide, ref, watch } from 'vue';
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  provide,
+  ref,
+  watch
+} from 'vue';
 
 import {
   MICRO_ATTRS_READ_KEY,
@@ -12,6 +16,7 @@ import {
 } from '../core/constants';
 import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroDialog } from '../core/types';
+import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
 
 interface Props {
   dialog: MicroDialog;
@@ -27,13 +32,13 @@ const emits = defineEmits<Emits>();
 
 const { getDialogAttrs, updateDialogAttrs } = useMicroRouter();
 
-const dialogRef = ref<HTMLDialogElement | null>(null);
+const FOCUSABLE_SELECTOR =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-provide(MICRO_DIALOG_PATH_KEY, props.dialog.path);
-provide(MICRO_ATTRS_READ_KEY, () => getDialogAttrs(props.dialog.path));
-provide(MICRO_ATTRS_WRITE_KEY, (attrs: Record<string, unknown>) => {
-  updateDialogAttrs(props.dialog.path, attrs);
-});
+let isOpen = false;
+
+const wrapperRef = ref<HTMLDivElement | null>(null);
+const previousFocus = ref<HTMLElement | null>(null);
 
 const transition = computed(() => props.dialog.transition ?? 'scale');
 const duration = computed(() => {
@@ -41,107 +46,166 @@ const duration = computed(() => {
     return props.dialog.transitionDuration;
   return transition.value === 'slide' ? 500 : 300;
 });
-
 const position = computed(() => props.dialog.position ?? 'standard');
-const sameless = computed(() => props.dialog.seamless ?? true);
+const seamless = computed(() => props.dialog.seamless ?? true);
+const isVisible = computed(
+  () => props.dialog.activated || !!props.dialog.closing
+);
 
-function handleCancel(e: Event) {
-  if (props.dialog.persistent) {
+function getFocusable(): HTMLElement[] {
+  if (!wrapperRef.value) return [];
+  return Array.from(
+    wrapperRef.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+  ).filter((el) => el.offsetParent !== null);
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (props.dialog.persistent) return;
     e.preventDefault();
+    e.stopPropagation();
+    emits('close', props.dialog.path);
     return;
   }
-  e.preventDefault();
-  emits('close', props.dialog.path);
+  if (e.key !== 'Tab') return;
+
+  const list = getFocusable();
+  if (list.length === 0) {
+    e.preventDefault();
+    wrapperRef.value?.focus();
+    return;
+  }
+
+  const first = list[0]!;
+  const last = list[list.length - 1]!;
+  const active = document.activeElement;
+  const inside = !!wrapperRef.value?.contains(active as Node);
+
+  if (e.shiftKey) {
+    if (!inside || active === first) {
+      e.preventDefault();
+      last.focus();
+    }
+  } else {
+    if (!inside || active === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
 }
 
 function handleBackdropClick(e: MouseEvent) {
   if (props.dialog.persistent) return;
-  if (e.target === dialogRef.value) {
+  if (e.target === e.currentTarget) {
     emits('close', props.dialog.path);
   }
 }
 
-/** Prime mobile keyboard by briefly focusing a hidden input inside the dialog */
 function primeMobileKeyboard() {
-  if (!props.dialog.focusInput || !dialogRef.value) return;
+  if (!props.dialog.focusInput || !wrapperRef.value) return;
   const input = document.createElement('input');
   input.style.cssText = 'position:fixed;opacity:0;height:0;width:0;top:-100px;';
-  dialogRef.value.appendChild(input);
+  wrapperRef.value.appendChild(input);
   input.focus();
   setTimeout(() => input.remove(), 50);
 }
 
-// Open native dialog when activated
+function open() {
+  if (isOpen) return;
+  isOpen = true;
+  previousFocus.value = document.activeElement as HTMLElement;
+  lockBodyScroll();
+  void nextTick(() => {
+    if (!wrapperRef.value) return;
+    const list = getFocusable();
+    (list[0] ?? wrapperRef.value).focus();
+    primeMobileKeyboard();
+  });
+}
+
+function close() {
+  if (!isOpen) return;
+  isOpen = false;
+  unlockBodyScroll();
+  const prev = previousFocus.value;
+  previousFocus.value = null;
+  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+    prev.focus();
+  }
+}
+
+provide(MICRO_DIALOG_PATH_KEY, props.dialog.path);
+provide(MICRO_ATTRS_READ_KEY, () => getDialogAttrs(props.dialog.path));
+provide(MICRO_ATTRS_WRITE_KEY, (attrs: Record<string, unknown>) => {
+  updateDialogAttrs(props.dialog.path, attrs);
+});
+
 watch(
   () => props.dialog.activated,
   (activated) => {
-    void nextTick(() => {
-      if (!dialogRef.value) return;
-      if (activated && !dialogRef.value.open) {
-        dialogRef.value.showModal();
-        primeMobileKeyboard();
-      }
-      // Don't call close() here — wait for closing animation to finish
-    });
-  },
-  { immediate: true },
+    if (activated) open();
+  }
 );
 
-// Close native dialog after closing animation completes
-// Dialog manager sets closing=true → waits transitionDuration → sets closing=false
 watch(
   () => props.dialog.closing,
   (closing) => {
-    if (!closing && !props.dialog.activated && dialogRef.value?.open) {
-      dialogRef.value.close();
-    }
-  },
+    if (!closing && !props.dialog.activated && isOpen) close();
+  }
 );
 
 onMounted(() => {
-  if (props.dialog.activated && dialogRef.value && !dialogRef.value.open) {
-    dialogRef.value.showModal();
-    primeMobileKeyboard();
-  }
+  if (props.dialog.activated) open();
+});
+
+onBeforeUnmount(() => {
+  if (isOpen) close();
 });
 </script>
 
 <template>
   <Teleport to="body">
-    <dialog
-      ref="dialogRef"
+    <div
+      v-if="isVisible"
+      class="micro-dialog-portal"
       :class="[
-        'micro-dialog',
         `micro-dialog--${position}`,
         dialog.fullscreen && 'micro-dialog--fullscreen',
-        sameless && 'micro-dialog--seamless',
-        `dialog-transition-${transition}`,
-        dialog.closing && 'micro-dialog--closing'
+        seamless && 'micro-dialog--seamless'
       ]"
       :style="{
-        '--dialog-duration': `${duration}ms`,
         zIndex: 100 + stackIndex,
-        width: '100vw',
-        height: '100dvh',
-        maxWidth: '100vw',
-        maxHeight: '100dvh',
-        margin: '0',
-        padding: '0',
-        inset: '0',
-        border: 'none',
-        outline: 'none',
+        '--dialog-duration': `${duration}ms`
       }"
-      @cancel="handleCancel"
-      @click="handleBackdropClick"
+      @click.self="handleBackdropClick"
     >
-      <div class="micro-dialog__content" style="width: 100%" @click.stop>
-        <slot />
-        <component
-          :is="dialog.component"
-          :key="dialog.componentKey"
-          v-bind="dialog.attrs"
-        />
+      <div
+        v-if="!seamless"
+        class="micro-dialog-backdrop"
+        :class="dialog.closing && 'micro-dialog-backdrop--closing'"
+      />
+      <div
+        ref="wrapperRef"
+        role="dialog"
+        aria-modal="true"
+        tabindex="-1"
+        class="micro-dialog"
+        :class="[
+          `dialog-transition-${transition}`,
+          dialog.closing && 'micro-dialog--closing'
+        ]"
+        @click.self="handleBackdropClick"
+        @keydown="handleKeydown"
+      >
+        <div class="micro-dialog__content" @click.stop>
+          <slot />
+          <component
+            :is="dialog.component"
+            :key="dialog.componentKey"
+            v-bind="dialog.attrs"
+          />
+        </div>
       </div>
-    </dialog>
+    </div>
   </Teleport>
 </template>
