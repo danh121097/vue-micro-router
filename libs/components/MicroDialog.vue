@@ -48,9 +48,6 @@ const duration = computed(() => {
 });
 const position = computed(() => props.dialog.position ?? 'standard');
 const seamless = computed(() => props.dialog.seamless ?? false);
-const isVisible = computed(
-  () => props.dialog.activated || !!props.dialog.closing
-);
 
 function getFocusable(): HTMLElement[] {
   if (!wrapperRef.value) return [];
@@ -166,7 +163,6 @@ onBeforeUnmount(() => {
 <template>
   <Teleport to="body">
     <div
-      v-if="isVisible"
       class="micro-dialog-portal"
       :class="[
         `micro-dialog--${position}`,
