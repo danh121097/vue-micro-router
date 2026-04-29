@@ -105,6 +105,7 @@ export function useDialogManager(
         state.dialogs.set(path, {
           ...dialog,
           activated: true,
+          closing: false,
           componentKey: (dialog.componentKey || 0) + 1,
           attrs: {
             path,
