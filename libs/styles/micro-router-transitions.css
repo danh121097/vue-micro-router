@@ -24,7 +24,7 @@
 }
 
 .route-page.deactivate {
-  transform: translateX(-20%);
+  /* transform: translateX(-20%); */
 }
 
 .route-page.deactivate::before {
