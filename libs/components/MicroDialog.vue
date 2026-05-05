@@ -98,13 +98,19 @@ function handleBackdropClick(e: MouseEvent) {
   }
 }
 
-function primeMobileKeyboard() {
-  if (!props.dialog.focusInput || !wrapperRef.value) return;
+function primeMobileKeyboard(done: () => void) {
+  if (!props.dialog.focusInput || !wrapperRef.value) {
+    done();
+    return;
+  }
   const input = document.createElement('input');
   input.style.cssText = 'position:fixed;opacity:0;height:0;width:0;top:-100px;';
   wrapperRef.value.appendChild(input);
   input.focus();
-  setTimeout(() => input.remove(), 50);
+  setTimeout(() => {
+    input.remove();
+    done();
+  }, 50);
 }
 
 function open() {
@@ -114,9 +120,13 @@ function open() {
   lockBodyScroll();
   void nextTick(() => {
     if (!wrapperRef.value) return;
-    const list = getFocusable();
-    (list[0] ?? wrapperRef.value).focus();
-    primeMobileKeyboard();
+    // Prime mobile keyboard first; only after temp input is removed do we
+    // focus the real target — otherwise the temp removal blurs it.
+    primeMobileKeyboard(() => {
+      if (!wrapperRef.value) return;
+      const list = getFocusable();
+      (list[0] ?? wrapperRef.value).focus();
+    });
   });
 }
 
