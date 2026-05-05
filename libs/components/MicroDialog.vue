@@ -136,7 +136,18 @@ function close() {
   unlockBodyScroll();
   const prev = previousFocus.value;
   previousFocus.value = null;
-  if (prev && typeof prev.focus === 'function' && document.contains(prev)) {
+  // Only restore focus if nothing else has claimed it (e.g. a stacked dialog
+  // that opened during this one's close animation). Otherwise we'd blur the
+  // newer dialog's auto-focused element.
+  const active = document.activeElement;
+  const focusInside = !!wrapperRef.value?.contains(active as Node);
+  const focusOnBody = !active || active === document.body;
+  if (
+    prev
+    && typeof prev.focus === 'function'
+    && document.contains(prev)
+    && (focusInside || focusOnBody)
+  ) {
     prev.focus();
   }
 }
