@@ -18,6 +18,8 @@ import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroDialog } from '../core/types';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
 import {
+  consumeDialogMobileKeyboardPrime,
+  getDialogAutofocusTarget,
   getDialogFocusableElements,
   getDialogInitialFocusTarget
 } from '../utils/dialog-focus';
@@ -38,6 +40,7 @@ const { getDialogAttrs, updateDialogAttrs } = useMicroRouter();
 
 let isOpen = false;
 let focusRequestId = 0;
+const MAX_FOCUS_ATTEMPTS = 12;
 
 const wrapperRef = ref<HTMLDivElement | null>(null);
 const previousFocus = ref<HTMLElement | null>(null);
@@ -98,35 +101,24 @@ function handleBackdropClick(e: MouseEvent) {
   }
 }
 
-function primeMobileKeyboard(done: () => void) {
-  if (!props.dialog.focusInput || !wrapperRef.value) {
-    done();
-    return;
-  }
-  const input = document.createElement('input');
-  input.style.cssText = 'position:fixed;opacity:0;height:0;width:0;top:-100px;';
-  wrapperRef.value.appendChild(input);
-  input.focus();
-  setTimeout(() => {
-    input.remove();
-    done();
-  }, 50);
-}
-
 function focusInitialTarget(shouldPrimeKeyboard: boolean) {
   const requestId = ++focusRequestId;
-  void nextTick(() => {
+  const focusWhenReady = (attempt = 0) => {
     if (!wrapperRef.value || !props.dialog.activated || requestId !== focusRequestId) return;
-    const focusTarget = () => {
-      if (!wrapperRef.value || !props.dialog.activated || requestId !== focusRequestId) return;
-      getDialogInitialFocusTarget(wrapperRef.value).focus();
-    };
-    if (shouldPrimeKeyboard) {
-      primeMobileKeyboard(focusTarget);
+    const autofocusTarget = getDialogAutofocusTarget(wrapperRef.value);
+    if (autofocusTarget) {
+      autofocusTarget.focus();
+      consumeDialogMobileKeyboardPrime();
       return;
     }
-    focusTarget();
-  });
+    if (shouldPrimeKeyboard && attempt < MAX_FOCUS_ATTEMPTS) {
+      requestAnimationFrame(() => focusWhenReady(attempt + 1));
+      return;
+    }
+    getDialogInitialFocusTarget(wrapperRef.value).focus();
+    consumeDialogMobileKeyboardPrime();
+  };
+  void nextTick(() => focusWhenReady());
 }
 
 function open() {

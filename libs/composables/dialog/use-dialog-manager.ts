@@ -22,6 +22,7 @@ import type {
   MicroDialog,
   PageTrackerHooks
 } from '../../core/types';
+import { primeDialogMobileKeyboard } from '../../utils/dialog-focus';
 import { isAsyncLoader, safeMarkRaw } from '../../utils/path-utils';
 import { createTimerManager } from '../../utils/timer-manager';
 
@@ -151,6 +152,7 @@ export function useDialogManager(
     props?: Record<string, unknown>
   ): DialogInstance {
     if (isProcessing) return createInstance(path, props);
+    if (state.dialogs.get(path)?.focusInput) primeDialogMobileKeyboard();
     isProcessing = true;
     try {
       const context = state.activeDialog || '';
