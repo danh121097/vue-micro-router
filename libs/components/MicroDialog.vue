@@ -17,6 +17,10 @@ import {
 import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroDialog } from '../core/types';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
+import {
+  getDialogFocusableElements,
+  getDialogInitialFocusTarget
+} from '../utils/dialog-focus';
 
 interface Props {
   dialog: MicroDialog;
@@ -31,9 +35,6 @@ const props = defineProps<Props>();
 const emits = defineEmits<Emits>();
 
 const { getDialogAttrs, updateDialogAttrs } = useMicroRouter();
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 let isOpen = false;
 
@@ -51,9 +52,7 @@ const seamless = computed(() => props.dialog.seamless ?? false);
 
 function getFocusable(): HTMLElement[] {
   if (!wrapperRef.value) return [];
-  return Array.from(
-    wrapperRef.value.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
-  ).filter((el) => el.offsetParent !== null);
+  return getDialogFocusableElements(wrapperRef.value);
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -124,8 +123,7 @@ function open() {
     // focus the real target — otherwise the temp removal blurs it.
     primeMobileKeyboard(() => {
       if (!wrapperRef.value) return;
-      const list = getFocusable();
-      (list[0] ?? wrapperRef.value).focus();
+      getDialogInitialFocusTarget(wrapperRef.value).focus();
     });
   });
 }
