@@ -3,7 +3,7 @@ const FOCUSABLE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 function isDialogFocusableElement(el: HTMLElement): boolean {
   if (!FOCUSABLE_TAGS.has(el.tagName) && !el.hasAttribute('tabindex')) return false;
   if (el.tagName === 'A' && !el.hasAttribute('href')) return false;
-  if (el.offsetParent === null) return false;
+  if (el.hidden || el.closest('[hidden],[inert]')) return false;
   if (el.getAttribute('aria-hidden') === 'true') return false;
   if (el.getAttribute('tabindex') === '-1') return false;
   if (el.hasAttribute('disabled')) return false;

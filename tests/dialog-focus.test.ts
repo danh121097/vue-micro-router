@@ -47,6 +47,7 @@ describe('dialog focus helpers', () => {
   test('ignores hidden proxy and tabindex -1 controls before autofocus input', () => {
     const root = setupRoot();
     root.innerHTML = [
+      '<input hidden>',
       '<input aria-hidden="true" tabindex="-1" readonly>',
       '<button tabindex="-1" type="button">country</button>',
       '<input autofocus data-target="real">',
