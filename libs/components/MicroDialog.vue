@@ -37,6 +37,7 @@ const emits = defineEmits<Emits>();
 const { getDialogAttrs, updateDialogAttrs } = useMicroRouter();
 
 let isOpen = false;
+let focusRequestId = 0;
 
 const wrapperRef = ref<HTMLDivElement | null>(null);
 const previousFocus = ref<HTMLElement | null>(null);
@@ -112,24 +113,36 @@ function primeMobileKeyboard(done: () => void) {
   }, 50);
 }
 
+function focusInitialTarget(shouldPrimeKeyboard: boolean) {
+  const requestId = ++focusRequestId;
+  void nextTick(() => {
+    if (!wrapperRef.value || !props.dialog.activated || requestId !== focusRequestId) return;
+    const focusTarget = () => {
+      if (!wrapperRef.value || !props.dialog.activated || requestId !== focusRequestId) return;
+      getDialogInitialFocusTarget(wrapperRef.value).focus();
+    };
+    if (shouldPrimeKeyboard) {
+      primeMobileKeyboard(focusTarget);
+      return;
+    }
+    focusTarget();
+  });
+}
+
 function open() {
-  if (isOpen) return;
+  if (isOpen) {
+    focusInitialTarget(props.dialog.focusInput ?? false);
+    return;
+  }
   isOpen = true;
   previousFocus.value = document.activeElement as HTMLElement;
   lockBodyScroll();
-  void nextTick(() => {
-    if (!wrapperRef.value) return;
-    // Prime mobile keyboard first; only after temp input is removed do we
-    // focus the real target — otherwise the temp removal blurs it.
-    primeMobileKeyboard(() => {
-      if (!wrapperRef.value) return;
-      getDialogInitialFocusTarget(wrapperRef.value).focus();
-    });
-  });
+  focusInitialTarget(props.dialog.focusInput ?? false);
 }
 
 function close() {
   if (!isOpen) return;
+  focusRequestId++;
   isOpen = false;
   unlockBodyScroll();
   const prev = previousFocus.value;
