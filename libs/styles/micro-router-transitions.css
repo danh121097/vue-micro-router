@@ -86,10 +86,6 @@
   pointer-events: auto;
 }
 
-.micro-control-wrapper {
-  display: contents;
-}
-
 /* ── Control Fade ────────────────────────────────── */
 .control-fade-move,
 .control-fade-enter-active,

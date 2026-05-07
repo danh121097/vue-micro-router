@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, provide, ref } from 'vue';
+import { provide } from 'vue';
 
 import {
   MICRO_ATTRS_READ_KEY,
@@ -7,15 +7,12 @@ import {
   MICRO_ROUTE_PATH_KEY
 } from '../core/constants';
 import { useMicroRouter } from '../composables/use-micro-router';
-import { focusInputWhenReady } from '../utils/dialog-focus';
 
 interface Props {
   routePath?: string;
 }
 
 const props = defineProps<Props>();
-const pageRef = ref<HTMLElement | null>(null);
-let cancelPendingFocus: (() => void) | null = null;
 
 if (props.routePath) {
   const path = props.routePath;
@@ -27,22 +24,10 @@ if (props.routePath) {
     updateRouteAttrs(path, attrs);
   });
 }
-
-onMounted(() => {
-  cancelPendingFocus = focusInputWhenReady(
-    () => pageRef.value,
-    true,
-    false
-  );
-});
-
-onBeforeUnmount(() => {
-  cancelPendingFocus?.();
-});
 </script>
 
 <template>
-  <div ref="pageRef" class="route-page">
+  <div class="route-page">
     <div class="route-page__body">
       <slot />
     </div>

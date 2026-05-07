@@ -1,5 +1,6 @@
 const FOCUSABLE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
 const AUTOFOCUS_TAGS = new Set(['INPUT', 'TEXTAREA']);
+const AUTOFOCUS_SELECTOR = 'input[autofocus],textarea[autofocus]';
 const MOBILE_USER_AGENT = /iPhone|iPad|iPod|Android/i;
 const MAX_AUTOFOCUS_ATTEMPTS = 12;
 
@@ -25,8 +26,8 @@ export function getDialogFocusableElements(root: HTMLElement): HTMLElement[] {
 }
 
 export function getDialogAutofocusTarget(root: HTMLElement): HTMLElement | undefined {
-  return getDialogFocusableElements(root).find(
-    (el) => AUTOFOCUS_TAGS.has(el.tagName) && el.hasAttribute('autofocus')
+  return Array.from(root.querySelectorAll<HTMLElement>(AUTOFOCUS_SELECTOR)).find(
+    (el) => AUTOFOCUS_TAGS.has(el.tagName) && isDialogFocusableElement(el)
   );
 }
 
