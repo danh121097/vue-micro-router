@@ -18,10 +18,8 @@ import { useMicroRouter } from '../composables/use-micro-router';
 import type { MicroDialog } from '../core/types';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
 import {
-  consumeDialogMobileKeyboardPrime,
-  getDialogAutofocusTarget,
+  focusInputWhenReady,
   getDialogFocusableElements,
-  getDialogInitialFocusTarget
 } from '../utils/dialog-focus';
 
 interface Props {
@@ -40,7 +38,7 @@ const { getDialogAttrs, updateDialogAttrs } = useMicroRouter();
 
 let isOpen = false;
 let focusRequestId = 0;
-const MAX_FOCUS_ATTEMPTS = 12;
+let cancelPendingFocus: (() => void) | null = null;
 
 const wrapperRef = ref<HTMLDivElement | null>(null);
 const previousFocus = ref<HTMLElement | null>(null);
@@ -103,22 +101,15 @@ function handleBackdropClick(e: MouseEvent) {
 
 function focusInitialTarget(shouldPrimeKeyboard: boolean) {
   const requestId = ++focusRequestId;
-  const focusWhenReady = (attempt = 0) => {
-    if (!wrapperRef.value || !props.dialog.activated || requestId !== focusRequestId) return;
-    const autofocusTarget = getDialogAutofocusTarget(wrapperRef.value);
-    if (autofocusTarget) {
-      autofocusTarget.focus();
-      consumeDialogMobileKeyboardPrime();
-      return;
-    }
-    if (shouldPrimeKeyboard && attempt < MAX_FOCUS_ATTEMPTS) {
-      requestAnimationFrame(() => focusWhenReady(attempt + 1));
-      return;
-    }
-    getDialogInitialFocusTarget(wrapperRef.value).focus();
-    consumeDialogMobileKeyboardPrime();
-  };
-  void nextTick(() => focusWhenReady());
+  cancelPendingFocus?.();
+  void nextTick(() => {
+    cancelPendingFocus = focusInputWhenReady(
+      () => wrapperRef.value,
+      shouldPrimeKeyboard,
+      true,
+      () => props.dialog.activated && requestId === focusRequestId
+    );
+  });
 }
 
 function open() {
@@ -135,6 +126,8 @@ function open() {
 function close() {
   if (!isOpen) return;
   focusRequestId++;
+  cancelPendingFocus?.();
+  cancelPendingFocus = null;
   isOpen = false;
   unlockBodyScroll();
   const prev = previousFocus.value;

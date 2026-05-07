@@ -75,6 +75,30 @@ describe('dialog focus helpers', () => {
     expect(getDialogInitialFocusTarget(root)).toBe(target);
   });
 
+  test('auto-targets only autofocus input or textarea', () => {
+    const root = setupRoot();
+    root.innerHTML = [
+      '<button type="button">first</button>',
+      '<input>',
+      '<select><option>SG</option></select>',
+      '<textarea autofocus data-target="real"></textarea>',
+    ].join('');
+
+    const target = root.querySelector<HTMLElement>('[data-target="real"]')!;
+    expect(getDialogAutofocusTarget(root)).toBe(target);
+  });
+
+  test('does not auto-target input or textarea without autofocus', () => {
+    const root = setupRoot();
+    root.innerHTML = [
+      '<button type="button">first</button>',
+      '<input>',
+      '<textarea></textarea>',
+    ].join('');
+
+    expect(getDialogAutofocusTarget(root)).toBeUndefined();
+  });
+
   test('mobile keyboard prime creates and consumes a proxy input synchronously', () => {
     Object.defineProperty(navigator, 'userAgent', {
       configurable: true,
@@ -84,7 +108,7 @@ describe('dialog focus helpers', () => {
     primeDialogMobileKeyboard();
 
     const proxy = document.body.querySelector<HTMLInputElement>(
-      'input[aria-hidden="true"][tabindex="-1"]'
+      'input[aria-label="Keyboard input"][tabindex="-1"]'
     );
     expect(proxy).toBeTruthy();
     expect(document.activeElement).toBe(proxy);
@@ -106,6 +130,6 @@ describe('dialog focus helpers', () => {
 
     primeDialogMobileKeyboard();
 
-    expect(document.body.querySelector('input[aria-hidden="true"]')).toBeNull();
+    expect(document.body.querySelector('input[aria-label="Keyboard input"]')).toBeNull();
   });
 });
