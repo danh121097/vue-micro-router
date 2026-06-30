@@ -332,6 +332,14 @@ export function useNavigation(
     props?: Record<string, unknown>
   ) {
     if (isNavigating.value) return;
+
+    // No-op when the destination resolves to the page we're already on.
+    // e.g. already at /A and pushing to A again → do nothing.
+    if (destination || destination === 0) {
+      const resolved = normalizePath(resolveDestinationPath(destination));
+      if (resolved === normalizePath(state.activePath)) return;
+    }
+
     isNavigating.value = true;
     try {
       // Run guard pipeline before any state mutation

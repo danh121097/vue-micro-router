@@ -90,8 +90,28 @@ export interface PluginTypedPush<Routes extends string, AttrsMap = {}> {
   (destination: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
+/**
+ * Validate a `/`-joined path where every segment must be a known route.
+ * Returns `S` when valid, else `never`. Given routes `'a' | 'b'`:
+ *   'a' ✓  'a/b' ✓  'b/a/b' ✓  'a/x' ✗ (→ never)  'x' ✗ (→ never)
+ * Walks the string via `infer` (bounded by segment count) — no infinite union,
+ * so it stays cheap for arbitrary depth like `'a/b/c/d/f'`.
+ */
+export type RouteSegmentPath<S extends string, Routes extends string> =
+  S extends `${infer Head}/${infer Rest}`
+    ? [Head] extends [Routes]
+      ? [RouteSegmentPath<Rest, Routes>] extends [never] ? never : S
+      : never
+    : [S] extends [Routes] ? S : never;
+
 export interface PluginTypedStepWisePush<Routes extends string, AttrsMap = {}> {
   <K extends Routes>(targetPath: K, ...args: PropsArgs<K, AttrsMap>): Promise<void>;
+  // Naked `S` keeps the literal inferable; the intersection collapses to `never`
+  // (rejecting the call) when any segment is not a known route.
+  <S extends string>(
+    targetPath: S & RouteSegmentPath<S, Routes>,
+    props?: Record<string, unknown>
+  ): Promise<void>;
   (targetPath: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 

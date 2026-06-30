@@ -445,6 +445,11 @@ const { stepWisePush, stepWiseBack } = useMicroRouter();
 // Walk through: home → home/onboarding → home/onboarding/step1
 await stepWisePush('/home/onboarding/step1');
 
+// Relative multi-segment paths are type-checked: every segment must be a
+// known route, joined by `/`, in any order and to any depth.
+await stepWisePush('onboarding/step1'); // ✅ each segment validated
+await stepWisePush('onboarding/oops');  // ❌ compile error — unknown segment
+
 // Step back through each page with animation
 await stepWiseBack(3);
 ```

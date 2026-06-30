@@ -61,6 +61,28 @@ describe('useNavigation', () => {
     expect(nav.activePath.value).toBe('/home/a');
   });
 
+  test('push to the current page is a no-op', async () => {
+    const afterEach = mock((_to: string, _from: string) => {});
+    const tracker = usePageTracker();
+    const nav = useNavigation(
+      { defaultPath: 'home', stepDelay: 10, guards: { afterEach: [afterEach] } } as any,
+      tracker
+    );
+    nav.registerRoute({ path: 'home', component: { render: () => null } } as any);
+    nav.registerRoute({ path: 'a', component: { render: () => null } } as any);
+
+    await nav.push('a');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(nav.activePage.value).toBe('a');
+    afterEach.mockClear();
+
+    // Already at /home/a → pushing 'a' (or its absolute path) does nothing
+    await nav.push('a');
+    await nav.push('/home/a');
+    expect(nav.activePath.value).toBe('/home/a');
+    expect(afterEach).not.toHaveBeenCalled();
+  });
+
   test('push is guarded against double navigation', async () => {
     const nav = createNav();
     nav.registerRoute({ path: 'home', component: { render: () => null } } as any);

@@ -10,6 +10,7 @@ import type {
   ExtractRoutePaths,
   ExtractDialogPaths,
   ExtractControlNames,
+  PluginTypedStepWisePush,
 } from '../libs/core/type-helpers';
 
 /* ── Helpers ── */
@@ -65,6 +66,27 @@ describe('Register type helpers', () => {
 
     type Names = ExtractControlNames<typeof _plugin>;
     type _Check = _Expect<_Equal<Names, 'hud'>>;
+    expect(true).toBe(true);
+  });
+
+  test('RouteSegmentPath validates slash-joined route segments at call sites', () => {
+    const stepWisePush = (() => Promise.resolve()) as PluginTypedStepWisePush<'a' | 'b'>;
+
+    // Single segments
+    void stepWisePush('a');
+    void stepWisePush('b');
+    // Slash-joined combinations, any order and arbitrary depth
+    void stepWisePush('a/b');
+    void stepWisePush('b/a');
+    void stepWisePush('a/b/a/b/a');
+    // Absolute paths still allowed (untyped escape hatch)
+    void stepWisePush('/anything/here');
+    // Unknown segments are rejected
+    // @ts-expect-error 'x' is not a known route
+    void stepWisePush('x');
+    // @ts-expect-error 'a/x' contains an unknown segment
+    void stepWisePush('a/x');
+
     expect(true).toBe(true);
   });
 });
