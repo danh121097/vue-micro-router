@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# VitePress cache (docs site source lives in website/ and IS committed)
+website/.vitepress/cache/
+
 # Package tarballs
 *.tgz
 

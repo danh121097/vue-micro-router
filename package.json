@@ -82,7 +82,8 @@
     "vite-plugin-dts": "^4.0.0",
     "vue": "^3.5.0",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^2.0.0"
+    "vue-tsc": "^2.0.0",
+    "vitepress": "^1.6.4"
   },
   "scripts": {
     "build": "vite build",
@@ -92,7 +93,10 @@
     "gen:types": "bun run scripts/gen-attrs-types.ts",
     "test": "bun test",
     "dev:example": "vite --config examples/vite.config.ts examples",
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website",
     "prepublishOnly": "bun run typecheck && bun test && bun run build",
-    "publish:npm": "npm version patch && bun run build && npm publish --access public && git push && git push --tags && gh release create v$(node -p \"require('./package.json').version\") --generate-notes --latest"
+    "publish:npm": "npm version patch && bun run build && npm publish --access public && git push"
   }
 }
