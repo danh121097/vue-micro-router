@@ -20,6 +20,8 @@ import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
 import {
   focusInputWhenReady,
   getDialogFocusableElements,
+  rememberDialogFocusOrigin,
+  resolveDialogFocusReturn,
 } from '../utils/dialog-focus';
 
 interface Props {
@@ -78,9 +80,14 @@ function handleKeydown(e: KeyboardEvent) {
   const last = list[list.length - 1]!;
   const active = document.activeElement;
   const inside = !!wrapperRef.value?.contains(active as Node);
+  // The dialog root holds focus whenever nothing inside it claimed focus on
+  // open. It sits before every focusable in DOM order, so forward Tab reaches
+  // them natively, but Shift+Tab would step backwards out of the dialog —
+  // treat the root as the leading boundary and wrap it to the last control.
+  const atRoot = active === wrapperRef.value;
 
   if (e.shiftKey) {
-    if (!inside || active === first) {
+    if (!inside || atRoot || active === first) {
       e.preventDefault();
       last.focus();
     }
@@ -106,7 +113,6 @@ function focusInitialTarget(shouldPrimeKeyboard: boolean) {
     cancelPendingFocus = focusInputWhenReady(
       () => wrapperRef.value,
       shouldPrimeKeyboard,
-      true,
       () => props.dialog.activated && requestId === focusRequestId
     );
   });
@@ -119,6 +125,12 @@ function open() {
   }
   isOpen = true;
   previousFocus.value = document.activeElement as HTMLElement;
+  // A dialog stacked over another records that dialog's root, which will be
+  // gone before this one closes in several flows — keep the link so close()
+  // can walk back to whatever opened the stack.
+  if (wrapperRef.value) {
+    rememberDialogFocusOrigin(wrapperRef.value, previousFocus.value);
+  }
   lockBodyScroll();
   focusInitialTarget(props.dialog.focusInput ?? false);
 }
@@ -130,7 +142,7 @@ function close() {
   cancelPendingFocus = null;
   isOpen = false;
   unlockBodyScroll();
-  const prev = previousFocus.value;
+  const prev = resolveDialogFocusReturn(previousFocus.value);
   previousFocus.value = null;
   // Only restore focus if nothing else has claimed it (e.g. a stacked dialog
   // that opened during this one's close animation). Otherwise we'd blur the

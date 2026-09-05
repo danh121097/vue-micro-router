@@ -31,17 +31,64 @@ export function getDialogAutofocusTarget(root: HTMLElement): HTMLElement | undef
   );
 }
 
-export function getDialogInitialFocusTarget(root: HTMLElement): HTMLElement {
-  const list = getDialogFocusableElements(root);
-  return list.find((el) => el.hasAttribute('autofocus')) ??
-    list[0] ??
-    root;
+/**
+ * Where focus came from when a dialog root opened.
+ *
+ * A dialog opened over another one records that dialog's root as its origin,
+ * because the root now holds focus. That root is often already detached by the
+ * time the upper dialog closes — `closeAllDialogs`, an out-of-order close, or a
+ * close/open swap all unmount the lower dialog first — so the origin has to be
+ * followed further back to find something still on screen.
+ *
+ * Entries are never removed: an out-of-order close needs the lower dialog's
+ * entry after that dialog has unmounted. A `WeakMap` keyed on the detached
+ * element handles the lifetime.
+ */
+const dialogFocusOrigins = new WeakMap<Element, HTMLElement | null>();
+
+/** Record what held focus when `root` opened. */
+export function rememberDialogFocusOrigin(
+  root: HTMLElement,
+  origin: HTMLElement | null
+) {
+  dialogFocusOrigins.set(root, origin);
+}
+
+/**
+ * Resolve where focus should return to, following the origin chain past any
+ * dialog roots that have since been removed from the document.
+ */
+export function resolveDialogFocusReturn(
+  origin: HTMLElement | null
+): HTMLElement | null {
+  let candidate = origin;
+  const seen = new Set<Element>();
+  while (candidate && !document.contains(candidate)) {
+    if (seen.has(candidate)) return null;
+    seen.add(candidate);
+    candidate = dialogFocusOrigins.get(candidate) ?? null;
+  }
+  return candidate;
+}
+
+/**
+ * Give the dialog element itself keyboard focus, unless something inside it
+ * already has it.
+ *
+ * The dialog root carries `tabindex="-1"`, so it is focusable from script
+ * without joining the tab order, and — unlike focusing an input — it never
+ * opens a mobile virtual keyboard. This matters because the Tab trap is a
+ * `keydown` listener on that root: while focus stays outside the dialog the
+ * listener never receives the event and the trap silently does nothing.
+ */
+function claimDialogRootFocus(root: HTMLElement) {
+  if (root.contains(document.activeElement)) return;
+  root.focus();
 }
 
 export function focusInputWhenReady(
   getRoot: () => HTMLElement | null | undefined,
   shouldWaitForInput = true,
-  shouldConsumePrime = true,
   isActive: () => boolean = () => true
 ) {
   let cancelled = false;
@@ -52,7 +99,7 @@ export function focusInputWhenReady(
     const target = getDialogAutofocusTarget(root);
     if (target) {
       target.focus();
-      if (shouldConsumePrime) consumeDialogMobileKeyboardPrime();
+      consumeDialogMobileKeyboardPrime();
       return;
     }
 
@@ -61,7 +108,11 @@ export function focusInputWhenReady(
       return;
     }
 
-    if (shouldConsumePrime) consumeDialogMobileKeyboardPrime();
+    // This dialog has no autofocus input. Release the mobile keyboard prime
+    // first — it parks focus on a hidden input — then hand focus to the dialog
+    // so it is not left outside a modal that claims `aria-modal="true"`.
+    consumeDialogMobileKeyboardPrime();
+    claimDialogRootFocus(root);
   };
 
   requestAnimationFrame(() => focusWhenReady());
