@@ -30,6 +30,13 @@ jobs:
       - name: Test
         run: bun test
 
+      # The suite shares one DOM realm across files (tests/setup-sfc.ts), so a
+      # test that installs a global and never restores it only fails once
+      # something else runs first. A fixed seed keeps that detectable without
+      # making CI itself nondeterministic.
+      - name: Test (randomized order)
+        run: bun test --randomize --seed=20260905
+
       - name: Build
         run: bun run build
 

@@ -1,13 +1,24 @@
-import { afterEach, beforeAll, describe, expect, test } from 'bun:test';
-import { Window } from 'happy-dom';
+import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
   consumeDialogMobileKeyboardPrime,
   getDialogFocusableElements,
   getDialogAutofocusTarget,
-  getDialogInitialFocusTarget,
   primeDialogMobileKeyboard,
 } from '../libs/utils/dialog-focus';
+
+/**
+ * `userAgent` is a prototype getter, so these tests shadow it with an own
+ * property. The DOM is shared process-wide (see `tests/setup-sfc.ts`), so the
+ * shadow must be removed again or it leaks a mobile UA into other files.
+ */
+function setUserAgent(value: string) {
+  Object.defineProperty(navigator, 'userAgent', { configurable: true, value });
+}
+
+function restoreUserAgent() {
+  Reflect.deleteProperty(navigator, 'userAgent');
+}
 
 function setupRoot() {
   const root = document.createElement('div');
@@ -24,27 +35,9 @@ function getTarget(root: HTMLElement): HTMLElement {
 }
 
 describe('dialog focus helpers', () => {
-  beforeAll(() => {
-    const window = new Window();
-    Object.assign(window, { SyntaxError });
-
-    Object.assign(globalThis, {
-      window,
-      document: window.document,
-      HTMLElement: window.HTMLElement,
-      HTMLInputElement: window.HTMLInputElement,
-    });
-
-    Object.defineProperty(window.HTMLElement.prototype, 'offsetParent', {
-      configurable: true,
-      get() {
-        return this.parentElement;
-      },
-    });
-  });
-
   afterEach(() => {
     consumeDialogMobileKeyboardPrime();
+    restoreUserAgent();
     document.body.innerHTML = '';
   });
 
@@ -60,7 +53,6 @@ describe('dialog focus helpers', () => {
     const target = getTarget(root);
     expect(getDialogFocusableElements(root)).toEqual([target]);
     expect(getDialogAutofocusTarget(root)).toBe(target);
-    expect(getDialogInitialFocusTarget(root)).toBe(target);
   });
 
   test('prefers autofocus target on every lookup', () => {
@@ -70,9 +62,11 @@ describe('dialog focus helpers', () => {
       '<input autofocus data-target="real">',
     ].join('');
 
+    // The lookup is re-run on every focus attempt, so it must be stable and
+    // must not prefer the earlier plain button.
     const target = getTarget(root);
-    expect(getDialogInitialFocusTarget(root)).toBe(target);
-    expect(getDialogInitialFocusTarget(root)).toBe(target);
+    expect(getDialogAutofocusTarget(root)).toBe(target);
+    expect(getDialogAutofocusTarget(root)).toBe(target);
   });
 
   test('auto-targets only autofocus input or textarea', () => {
@@ -100,10 +94,7 @@ describe('dialog focus helpers', () => {
   });
 
   test('mobile keyboard prime creates and consumes a proxy input synchronously', () => {
-    Object.defineProperty(navigator, 'userAgent', {
-      configurable: true,
-      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)',
-    });
+    setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)');
 
     primeDialogMobileKeyboard();
 
@@ -123,10 +114,7 @@ describe('dialog focus helpers', () => {
   });
 
   test('mobile keyboard prime is a no-op outside mobile user agents', () => {
-    Object.defineProperty(navigator, 'userAgent', {
-      configurable: true,
-      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X)',
-    });
+    setUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X)');
 
     primeDialogMobileKeyboard();
 

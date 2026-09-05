@@ -3,3 +3,6 @@ peer = false
 
 [install.lockfile]
 save = true
+
+[test]
+preload = ["./tests/setup-sfc.ts"]
