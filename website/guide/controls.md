@@ -74,10 +74,26 @@ const config: MicroRouterConfig = {
 
 ## Vue Devtools
 
-Automatic in development — shows a "Micro Router" inspector tab with:
+Opt in with `config.devtools: true` — shows a "Micro Router" inspector tab with:
 - Current path and page stack
 - Open dialogs with attrs
 - Active controls
 - Navigation timeline events
 
-Requires `@vue/devtools-api` (optional peer dependency). Zero cost in production builds.
+```ts
+const config: MicroRouterConfig = {
+  defaultPath: 'home',
+  devtools: import.meta.env.DEV, // keep it out of your production builds
+};
+```
+
+Requires `@vue/devtools-api` (optional peer dependency); without it the load
+warns and no-ops. The inspector is loaded with a dynamic `import()`, so it is a
+separate chunk that is never fetched while the flag is off, and the core entry
+carries none of it.
+
+Off means never fetched, not absent from your build output: `config.devtools`
+is read inside the library, so no bundler can prove it false and the chunk still
+lands in your `dist/` (measured: eager entry −2,753 B, total emitted +793 B).
+Setting it from `import.meta.env.DEV` keeps devtools out of what production
+*runs*, not out of what it *ships*.

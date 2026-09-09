@@ -41,11 +41,6 @@ import type {
 } from '../core/type-helpers';
 import { getLastSegment } from '../utils/path-utils';
 import { useControlManager } from './control/use-control-manager';
-import {
-  setupDevtoolsPlugin,
-  emitDevtoolsEvent,
-  refreshDevtoolsInspector
-} from '../devtools/devtools-plugin';
 import { serializeState, restoreState } from './use-state-serializer';
 import { useDialogManager } from './dialog/use-dialog-manager';
 import { useNavigation } from './navigation/use-navigation';
@@ -164,6 +159,22 @@ export function useGlobalMicroRouter(
       : {})
   };
 
+  /**
+   * Devtools module handle — resolved only when `config.devtools` is on.
+   *
+   * Held per store rather than at module scope, so a router with the flag off
+   * never emits because a sibling router turned it on. Static-importing these
+   * functions would pull the inspector body back into the core bundle, which is
+   * the whole point of loading it lazily.
+   */
+  let devtools: typeof import('../devtools/devtools-plugin') | null = null;
+  /**
+   * Set before the import can resolve, so a router unmounted inside that window
+   * never registers. Without it the inspector closure holds a store that is off
+   * screen — and everything its refs reach — for the life of the page.
+   */
+  let devtoolsDisposed = false;
+
   // Cross-concern: navigation → controls (gui leave/enter on page change)
   const defaultPage = getLastSegment(config.defaultPath);
 
@@ -176,11 +187,9 @@ export function useGlobalMicroRouter(
     if (page === defaultPage && oldPage !== defaultPage) {
       tracker.trackGuiEnter(active);
     }
-    // Devtools: emit navigation event (dev-only — zero cost in production)
-    if ((import.meta as any).env?.DEV) {
-      emitDevtoolsEvent('navigate', { from: oldPage, to: page });
-      refreshDevtoolsInspector();
-    }
+    // Devtools: no-op until the opt-in chunk resolves, and forever without it.
+    devtools?.emitDevtoolsEvent('navigate', { from: oldPage, to: page });
+    devtools?.refreshDevtoolsInspector();
   });
 
   // Audio: BGM updated inline in push/stepWisePush/stepWiseBack (user gesture context).
@@ -206,11 +215,27 @@ export function useGlobalMicroRouter(
     if (audio) {
       document.addEventListener('visibilitychange', audio.handleVisibilityChange);
     }
-    // Initialize devtools (no-ops in production or when @vue/devtools-api not installed)
-    setupDevtoolsPlugin(store);
+    // Devtools: opt-in, so the inspector is fetched only when asked for and
+    // never enters the core bundle. Silently no-ops without @vue/devtools-api.
+    if (config.devtools) {
+      void import('../devtools/devtools-plugin')
+        .then((mod) => {
+          if (devtoolsDisposed) return;
+          devtools = mod;
+          return mod.setupDevtoolsPlugin(store);
+        })
+        .catch(() => {
+          // A failed chunk fetch (deploy rollover, flaky network) must not
+          // surface as an unhandled rejection in the consumer's error tracker;
+          // devtools is a development aid, not something worth reporting on.
+        });
+    }
   });
 
   onBeforeUnmount(() => {
+    devtoolsDisposed = true;
+    devtools?.teardownDevtoolsPlugin(store);
+    devtools = null;
     tracker.cleanupAllSessions();
     navigation.cleanup();
     dialogs.cleanup();

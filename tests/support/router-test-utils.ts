@@ -49,6 +49,8 @@ export interface MountRouterOptions {
   nested?: boolean;
   /** Navigation lock duration; lower it to keep timing-sensitive tests short. */
   stepDelay?: number;
+  /** Devtools opt-in; omit to leave the flag absent, as a normal consumer has it. */
+  devtools?: boolean;
   /** Global mixins — pass `createUpdateCounter().mixin` to tally re-renders. */
   mixins?: ComponentOptions[];
 }
@@ -102,6 +104,7 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
     controls = [],
     nested = false,
     stepDelay,
+    devtools,
     mixins = []
   } = options;
 
@@ -118,7 +121,12 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
 
   const wrapper = mount(MicroRouterView, {
     props: {
-      config: { defaultPath, defaultControlName, ...(stepDelay ? { stepDelay } : {}) },
+      config: {
+        defaultPath,
+        defaultControlName,
+        ...(stepDelay ? { stepDelay } : {}),
+        ...(devtools === undefined ? {} : { devtools })
+      },
       plugins: [plugin],
       nested
     },

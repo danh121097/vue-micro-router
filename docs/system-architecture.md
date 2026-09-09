@@ -391,14 +391,31 @@ Custom inspector tab "Micro Router" with sections:
 
 ### Timeline
 
-Events: push, back, openDialog, closeDialog, toggleControl
-Includes: timestamp, path/name, attrs delta
+Events: `navigate`, one per page change, emitted from the `activePage` watcher
+in `use-micro-router.ts`. Includes: timestamp, `from`/`to` page.
 
-### Production Cost
+Dialog and control activity is **not** on the timeline — it is visible in the
+inspector tree only. A same-page push emits nothing, and a back is reported as
+`navigate` like any other page change. This section claimed five event types for
+as long as the plugin was dead code; it never emitted more than the one.
 
-- Zero: `__VUE_PROD_DEVTOOLS__` guard eliminates all code
-- Development: <0.1ms overhead per operation
-- Optional dependency: @vue/devtools-api
+### Cost
+
+- Off by default: `config.devtools` gates both setup and every timeline emit,
+  so the cost of leaving it off is one boolean check per navigation
+- Loaded with a dynamic `import()`, so the inspector is a separate chunk
+  (`dist/devtools-plugin.mjs`, 0.93 kB gzip) that is never fetched while the
+  flag is off — the core entry carries none of it
+- On: <0.1ms overhead per operation
+- Off does **not** mean absent from the consumer's build: the flag is read
+  inside the library, so the chunk still ships (measured on a Vite 6 consumer:
+  eager entry −2,753 B, total emitted +793 B). What it buys is a smaller eager
+  entry and a fetch that never happens
+- Optional dependency: @vue/devtools-api — without it the load warns and no-ops
+
+Earlier releases gated this on `import.meta.env.DEV`, which the library build
+substituted to a constant `false`. That made the plugin unreachable for every
+consumer while its body still shipped inside the core entry.
 
 ---
 

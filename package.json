@@ -71,6 +71,7 @@
     "@types/howler": "^2.2.12",
     "howler": "^2.2.4",
     "@vitejs/plugin-vue": "^5.0.0",
+    "@vue/devtools-api": "^7.7.0",
     "@vue/test-utils": "^2.4.6",
     "ajv": "^8.18.0",
     "eslint": "^10.2.0",
@@ -97,6 +98,6 @@
     "docs:build": "vitepress build website",
     "docs:preview": "vitepress preview website",
     "prepublishOnly": "bun run typecheck && bun test && bun run build",
-    "publish:npm": "npm version patch && bun run build && npm publish --access public && git push"
+    "publish:npm": "npm version ${BUMP:-patch} && bun run build && npm publish --access public && git push"
   }
 }

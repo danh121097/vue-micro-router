@@ -164,6 +164,14 @@ export interface MicroRouterConfig {
   defaultBgm?: string;
   /** Set to true (in a user gesture handler) to start default BGM. Watched with flush:'sync' to preserve gesture context for autoplay policy. */
   bgmStartRef?: Ref<boolean>;
+  /**
+   * Vue Devtools inspector and timeline — opt-in, development only.
+   *
+   * Loaded with a dynamic `import()`, so the inspector ships as its own chunk
+   * and is never fetched while this is off. Also needs `@vue/devtools-api`
+   * installed (optional peer dependency); without it the load no-ops.
+   */
+  devtools?: boolean;
 }
 
 // ── Serialized State ─────────────────────────────────────────────────────────
