@@ -46,12 +46,42 @@ export function useGestureNavigation(
   let currentPage: HTMLElement | null = null;
   let prevPage: HTMLElement | null = null;
 
-  /** Resolve the actual DOM element — handles both raw HTMLElement refs and Vue component instance refs ($el) */
+  /**
+   * Viewport width, read once per gesture.
+   *
+   * It cannot change mid-drag, and reading it in `onPointerMove` put a layout
+   * read between two `style.transform` writes on every single move — a forced
+   * synchronous layout for the whole length of the drag.
+   */
+  let viewportWidth = 0;
+
+  /** Pending drag distance, applied on the next frame rather than per move. */
+  let pendingDeltaX = 0;
+  let frameHandle: number | null = null;
+
+  /**
+   * The element the listeners are bound to, kept so unbinding uses the same one
+   * even if the ref has already been torn down.
+   */
+  let boundEl: HTMLElement | null = null;
+
+  /**
+   * Resolve the actual DOM element — handles raw HTMLElement refs, Vue
+   * component instance refs (`$el`), and fragment roots.
+   *
+   * The container this is given is a tag-less `<TransitionGroup>`, which
+   * renders a fragment: its `$el` is the fragment's anchor **text node**, not an
+   * element. Pointer events never reach a text node, so binding there meant the
+   * swipe-back gesture could not fire at all — for any consumer, in any browser.
+   * The element that actually contains the pages is that anchor's parent.
+   */
   function resolveElement(): HTMLElement | null {
     const ref = ctx.containerRef.value;
     if (!ref) return null;
-    if ('$el' in ref) return (ref as any).$el as HTMLElement;
-    return ref as HTMLElement;
+    const node = ('$el' in ref ? (ref as any).$el : ref) as Node | null;
+    if (!node) return null;
+    if (node.nodeType !== 1) return node.parentElement;
+    return node as HTMLElement;
   }
 
   function getPages(): { current: HTMLElement | null; previous: HTMLElement | null } {
@@ -76,6 +106,9 @@ export function useGestureNavigation(
     startTime = Date.now();
     currentPage = current;
     prevPage = previous;
+    viewportWidth = window.innerWidth;
+    pendingDeltaX = 0;
+    bindDragListeners();
 
     // Capture pointer on container to keep receiving events even if child elements change
     const container = resolveElement();
@@ -101,25 +134,46 @@ export function useGestureNavigation(
       return;
     }
 
-    const progress = deltaX / window.innerWidth;
-    currentPage.style.transform = `translateX(${deltaX}px)`;
+    // A pointer can fire several moves per frame; only the last one is visible.
+    // Recording the position and painting once per frame keeps the write count
+    // tied to frames rather than to event count.
+    pendingDeltaX = deltaX;
+    if (frameHandle === null) {
+      frameHandle = requestAnimationFrame(paintDrag);
+    }
+  }
+
+  function paintDrag() {
+    frameHandle = null;
+    if (!tracking || !currentPage) return;
+
+    currentPage.style.transform = `translateX(${pendingDeltaX}px)`;
 
     if (prevPage) {
       // Previous page peeks from -20% toward 0%
+      const progress = viewportWidth > 0 ? pendingDeltaX / viewportWidth : 0;
       const prevOffset = -20 + (20 * progress);
       prevPage.style.transform = `translateX(${prevOffset}%)`;
     }
   }
 
+  function cancelPendingFrame() {
+    if (frameHandle === null) return;
+    cancelAnimationFrame(frameHandle);
+    frameHandle = null;
+  }
+
   function onPointerUp(e: PointerEvent) {
-    if (!tracking || !currentPage) return;
+    if (!tracking || !currentPage) { unbindDragListeners(); return; }
+    cancelPendingFrame();
+    unbindDragListeners();
     // Validate DOM refs are still connected (Vue may have re-rendered)
     if (!currentPage.isConnected) { resetStyles(); tracking = false; return; }
 
     const deltaX = e.clientX - startX;
     const elapsed = Date.now() - startTime;
     const velocity = deltaX / elapsed; // px/ms
-    const progress = deltaX / window.innerWidth;
+    const progress = viewportWidth > 0 ? deltaX / viewportWidth : 0;
 
     const shouldNavigate = progress > threshold || velocity > velocityThreshold;
 
@@ -151,6 +205,8 @@ export function useGestureNavigation(
   }
 
   function cancelGesture() {
+    cancelPendingFrame();
+    unbindDragListeners();
     if (!tracking) return;
     if (currentPage) {
       currentPage.style.transition = 'transform 0.15s ease-out';
@@ -165,6 +221,7 @@ export function useGestureNavigation(
   }
 
   function resetStyles() {
+    cancelPendingFrame();
     if (currentPage) {
       currentPage.style.willChange = '';
       currentPage.style.transition = '';
@@ -179,21 +236,37 @@ export function useGestureNavigation(
     prevPage = null;
   }
 
+  /**
+   * `pointermove` fires continuously whenever a pointer is over the container,
+   * dragging or not. Binding it only for the length of a gesture keeps the
+   * handler off the hot path for every ordinary scroll and mouse move.
+   */
+  function bindDragListeners() {
+    if (!boundEl) return;
+    boundEl.addEventListener('pointermove', onPointerMove, { passive: true });
+    boundEl.addEventListener('pointerup', onPointerUp, { passive: true });
+    boundEl.addEventListener('pointercancel', cancelGesture, { passive: true });
+  }
+
+  function unbindDragListeners() {
+    if (!boundEl) return;
+    boundEl.removeEventListener('pointermove', onPointerMove);
+    boundEl.removeEventListener('pointerup', onPointerUp);
+    boundEl.removeEventListener('pointercancel', cancelGesture);
+  }
+
   onMounted(() => {
     const el = resolveElement();
     if (!el?.addEventListener) return;
+    boundEl = el;
     el.addEventListener('pointerdown', onPointerDown, { passive: true });
-    el.addEventListener('pointermove', onPointerMove, { passive: true });
-    el.addEventListener('pointerup', onPointerUp, { passive: true });
-    el.addEventListener('pointercancel', cancelGesture, { passive: true });
   });
 
   onBeforeUnmount(() => {
-    const el = resolveElement();
-    if (!el?.removeEventListener) return;
-    el.removeEventListener('pointerdown', onPointerDown);
-    el.removeEventListener('pointermove', onPointerMove);
-    el.removeEventListener('pointerup', onPointerUp);
-    el.removeEventListener('pointercancel', cancelGesture);
+    cancelPendingFrame();
+    if (!boundEl?.removeEventListener) return;
+    boundEl.removeEventListener('pointerdown', onPointerDown);
+    unbindDragListeners();
+    boundEl = null;
   });
 }

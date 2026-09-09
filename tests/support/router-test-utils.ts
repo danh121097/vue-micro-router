@@ -21,6 +21,7 @@ import { mount, type VueWrapper } from '@vue/test-utils';
 
 import MicroRouterView from '../../libs/components/MicroRouterView.vue';
 import { useMicroRouter } from '../../libs/composables/use-micro-router';
+import type { GestureConfig } from '../../libs/composables/navigation/use-gesture-navigation';
 import type {
   FeaturePlugin,
   MicroControl,
@@ -51,6 +52,8 @@ export interface MountRouterOptions {
   stepDelay?: number;
   /** Devtools opt-in; omit to leave the flag absent, as a normal consumer has it. */
   devtools?: boolean;
+  /** Swipe-back gesture config; omit to leave the feature off. */
+  gesture?: GestureConfig;
   /** Global mixins — pass `createUpdateCounter().mixin` to tally re-renders. */
   mixins?: ComponentOptions[];
 }
@@ -105,6 +108,7 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
     nested = false,
     stepDelay,
     devtools,
+    gesture,
     mixins = []
   } = options;
 
@@ -125,7 +129,8 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
         defaultPath,
         defaultControlName,
         ...(stepDelay ? { stepDelay } : {}),
-        ...(devtools === undefined ? {} : { devtools })
+        ...(devtools === undefined ? {} : { devtools }),
+        ...(gesture === undefined ? {} : { gesture })
       },
       plugins: [plugin],
       nested
