@@ -203,6 +203,7 @@ onBeforeUnmount(() => {
         '--dialog-duration': `${duration}ms`
       }"
       @click.self="handleBackdropClick"
+      @mousedown.self.prevent
     >
       <div
         v-if="!seamless"
@@ -220,6 +221,7 @@ onBeforeUnmount(() => {
           dialog.closing && 'micro-dialog--closing'
         ]"
         @click.self="handleBackdropClick"
+        @mousedown.self.prevent
         @keydown="handleKeydown"
       >
         <div class="micro-dialog__content" @click.stop>

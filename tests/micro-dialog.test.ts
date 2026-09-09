@@ -439,3 +439,76 @@ describe('MicroDialog — focus restore across a stack', () => {
     expect(document.activeElement).toBe(opener);
   });
 });
+
+/**
+ * F5a — `.micro-dialog` is `pointer-events: none`, so a click on the dimmed
+ * area lands on the non-focusable portal and the browser moves focus to
+ * `<body>`. A non-persistent dialog closes on that click so it never mattered;
+ * a persistent one stays open with focus outside itself, and because the Tab
+ * trap is a `keydown` listener on the dialog root, the next Tab never reaches
+ * it. `@mousedown.self.prevent` stops the focus move without touching the click
+ * that closes non-persistent dialogs.
+ */
+describe('MicroDialog — backdrop focus (F5a)', () => {
+  function mousedown(el: Element): MouseEvent {
+    const event = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
+    el.dispatchEvent(event);
+    return event;
+  }
+
+  test('mousedown on the portal is prevented, so focus cannot leave', async () => {
+    const r = mountWithDialogs(true);
+    await flush(2);
+    r.store.openDialog('confirm');
+    await flush(4);
+    await wait(60);
+
+    const portal = portalEl()!;
+    const event = mousedown(portal);
+
+    // preventDefault on mousedown is what stops the browser moving focus.
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  test('mousedown inside the dialog content is left alone', async () => {
+    const r = mountWithDialogs(true);
+    await flush(2);
+    r.store.openDialog('confirm');
+    await flush(4);
+    await wait(60);
+
+    const content = document.querySelector('.micro-dialog__content')!;
+    const event = mousedown(content);
+
+    // Only `.self` mousedowns are prevented — a control inside the dialog must
+    // still be able to take focus on press.
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  test('a persistent dialog still does not close on a backdrop press', async () => {
+    const r = mountWithDialogs(true);
+    await flush();
+    r.store.openDialog('confirm');
+    await flush(6);
+
+    mousedown(portalEl()!);
+    click(portalEl()!);
+    await flush(6);
+
+    expect(r.store.activeDialog.value).toBe('confirm');
+  });
+
+  test('a non-persistent dialog still closes on a backdrop press', async () => {
+    const r = mountWithDialogs();
+    await flush();
+    r.store.openDialog('confirm');
+    await flush(6);
+
+    // The prevented mousedown must not swallow the click that closes it.
+    mousedown(portalEl()!);
+    click(portalEl()!);
+    await flush(6);
+
+    expect(r.store.activeDialog.value).toBe('');
+  });
+});
