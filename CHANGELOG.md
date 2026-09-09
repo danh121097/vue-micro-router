@@ -1,6 +1,9 @@
 # Changelog
 
-## 1.1.0 — 2026-09-09
+## 1.1.2 — 2026-09-09
+
+*(Released as 1.1.2. The 1.1.0 and 1.1.1 version bumps were never published —
+both publish attempts aborted at npm's 2FA prompt before uploading.)*
 
 Two features shipped in earlier releases without ever working. Both are fixed
 here, so the visible change for most consumers is that things start happening
