@@ -68,6 +68,34 @@ const useCss = computed(
   () => hasSharedSegments.value && activeTransition.value !== 'none'
 );
 
+/**
+ * Per-page inline styles, one entry per stacked route.
+ *
+ * Built here rather than as a literal in the `v-for`: the page stack re-renders
+ * three times per navigation (twice on the push, once when `isNavigating` flips
+ * back), and as a literal the style object and its two `transition` template
+ * strings were rebuilt for every page on every one of those renders. Memoised,
+ * it is one build pass per change to the routes or the transition config, still
+ * one object per page. Measured over one navigation on a four-page stack:
+ * 11 objects and 11 transition strings inline, 4 objects and 1 string here.
+ *
+ * This saves the construction, not the style patch. `getTransitionRawChildren`
+ * clones every keyed child (`cloneVNode(child, { key })`) and `mergeProps`
+ * rebuilds `style` from an array, so the vnode carries a fresh object per
+ * render either way — that copy is Vue's and predates this change.
+ */
+const pageStyles = computed(() => {
+  const transition = useCss.value
+    ? `transform ${transitionDuration.value}ms cubic-bezier(0.65, 0, 0.35, 1), opacity ${transitionDuration.value}ms ease`
+    : 'none';
+  const height = props.nested ? '100%' : '100dvh';
+  return resolveRoutes.value.map((_, i) => ({
+    transition,
+    zIndex: 10 + i,
+    '--mr-page-height': height
+  }));
+});
+
 // Gesture navigation (swipe-back from left edge)
 if (props.config.gesture?.enabled) {
   useGestureNavigation(props.config.gesture, {
@@ -97,13 +125,7 @@ if (props.config.gesture?.enabled) {
         deactivate: resolveRoutes.length > 1 && i !== resolveRoutes.length - 1,
         'micro-router--navigating': isNavigating
       }"
-      :style="{
-        transition: useCss
-          ? `transform ${transitionDuration}ms cubic-bezier(0.65, 0, 0.35, 1), opacity ${transitionDuration}ms ease`
-          : 'none',
-        zIndex: 10 + i,
-        '--mr-page-height': nested ? '100%' : '100dvh'
-      }"
+      :style="pageStyles[i]"
     >
       <component
         :is="route.component"

@@ -254,7 +254,19 @@ export interface MicroRouterStore {
   stepWiseBack: (steps: number) => Promise<void>;
   registerRoute: (route: MicroRoute) => void;
   registerRoutes: (routes: MicroRoute[]) => void;
+  /** Merge attrs into a segment and notify readers — the mounted page re-renders. */
   updateRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
+  /**
+   * Merge attrs into a segment for persistence only — no reactive notification,
+   * so a mounted page is not re-rendered with props it already holds. This is
+   * the path `useMicroState` writes back on; use `updateRouteAttrs` when the
+   * page must see the change.
+   */
+  persistRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
+  /**
+   * The stored attrs object for a segment — live, not a snapshot:
+   * `persistRouteAttrs` merges into it in place. Copy it if you need to keep it.
+   */
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
   /** Manually preload an async route component by segment name */
   preloadRoute: (segment: string) => Promise<void>;

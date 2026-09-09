@@ -39,7 +39,19 @@ export const MICRO_ATTRS_READ_KEY: InjectionKey<
   () => Record<string, unknown> | undefined
 > = Symbol('micro-attrs-read');
 
-/** Inject/provide key for writing attrs — consumed by useMicroState to sync mutations back to store */
+/**
+ * Inject/provide key for writing attrs — consumed by useMicroState to sync
+ * mutations back to store.
+ *
+ * The three providers do not behave identically, by design. `RoutePage`
+ * provides `persistRouteAttrs`, which stores without notifying: the route attrs
+ * are bound straight back onto the page as props, so notifying would re-render
+ * the page with data it just produced. `MicroDialog` and `MicroControlWrapper`
+ * provide the notifying writer, because their props come from the dialog and
+ * control definition objects rather than from the attrs Map — there is no echo
+ * on those paths. Call `updateRouteAttrs` directly if you inject this writer in
+ * a page and need the write to reach reactive readers.
+ */
 export const MICRO_ATTRS_WRITE_KEY: InjectionKey<
   (attrs: Record<string, unknown>) => void
 > = Symbol('micro-attrs-write');

@@ -16,6 +16,7 @@ import {
   reactive,
   ref,
   shallowReactive,
+  toRaw,
   type AsyncComponentLoader,
   type ComputedRef
 } from 'vue';
@@ -64,6 +65,7 @@ export interface NavigationState {
   registerRoute: (route: MicroRoute) => void;
   registerRoutes: (routes: MicroRoute[]) => void;
   updateRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
+  persistRouteAttrs: (segment: string, attrs: Record<string, unknown>) => void;
   getRouteAttrs: (segment: string) => Record<string, unknown> | undefined;
   /** Manually preload an async route component */
   preloadRoute: (segment: string) => Promise<void>;
@@ -205,6 +207,40 @@ export function useNavigation(
     state.routeAttrs.set(segment, { ...existing, ...attrs });
   }
 
+  /**
+   * Merge attrs into a segment *without* notifying reactive readers.
+   *
+   * This is the `useMicroState` write-back path, and that write is an echo: the
+   * page mutated its own `reactive()` state and this only records the result so
+   * it survives a remount. Notifying would re-render the page with props it
+   * just produced — one wasted subtree diff per keystroke.
+   *
+   * The write goes to the raw Map, so the `shallowReactive` key dep stays
+   * untriggered; a later render for any other reason still reads the fresh
+   * value through `getRouteAttrs`. Merging happens in place for the same
+   * reason — a new object identity is what a reactive reader would notice.
+   * Note this also skips the Map's iteration dep, so a future reader that
+   * iterates `routeAttrs` or reads `.size` reactively would not see new keys.
+   *
+   * The first write clones, so the store never takes ownership of — or later
+   * mutates — an object the caller still holds. Steady state stays at one
+   * clone per mutation, the one `useMicroState` already makes.
+   *
+   * External callers that *do* need the page to re-render (`push(path, props)`,
+   * state restore) go through {@link updateRouteAttrs} instead.
+   */
+  function persistRouteAttrs(segment: string, attrs: Record<string, unknown>) {
+    const attrsMap = toRaw(state.routeAttrs);
+    const existing = attrsMap.get(segment);
+    if (existing) Object.assign(existing, attrs);
+    else attrsMap.set(segment, { ...attrs });
+  }
+
+  /**
+   * The stored attrs object for a segment. Mutated in place by
+   * {@link persistRouteAttrs}, so a captured reference is live, not a snapshot —
+   * copy it if you need one.
+   */
   function getRouteAttrs(segment: string): Record<string, unknown> | undefined {
     return state.routeAttrs.get(segment);
   }
@@ -431,6 +467,7 @@ export function useNavigation(
     registerRoute: registry.registerRoute,
     registerRoutes: registry.registerRoutes,
     updateRouteAttrs,
+    persistRouteAttrs,
     getRouteAttrs,
     preloadRoute: registry.preloadRoute,
     routes: registry.routes,

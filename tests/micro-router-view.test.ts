@@ -8,6 +8,7 @@
  * Counts aggregate by component name, so `RoutePage` is the total across every
  * mounted page. Each assertion says which reading it is.
  */
+/* eslint-disable vue/one-component-per-file -- probe components are test fixtures, not app components */
 import { afterEach, describe, expect, test } from 'bun:test';
 import { defineComponent, h, markRaw } from 'vue';
 
@@ -39,6 +40,31 @@ const StatefulPage = markRaw(
   })
 );
 
+/**
+ * Page holding nested state. `useMicroState` watches a `reactive()` source, so
+ * the watcher is deep without a `deep` flag — this fixture is what pins that.
+ */
+let nestedState: { profile: { value: { name: string } } } | null = null;
+const NestedStatePage = markRaw(
+  defineComponent({
+    name: 'NestedStatePage',
+    setup() {
+      const state = useMicroState({ profile: { name: 'a' } });
+      nestedState = state as unknown as { profile: { value: { name: string } } };
+      return () => h('div', { class: 'nested-state' }, state.profile.value.name);
+    }
+  })
+);
+
+/** Page whose props come straight from the store's route attrs. */
+const BadgePage = markRaw(
+  defineComponent({
+    name: 'BadgePage',
+    props: { badge: { type: Number, default: 0 } },
+    setup: (props) => () => h('div', { class: 'badge' }, String(props.badge))
+  })
+);
+
 const homeAndDetail = [
   { path: 'home', component: createPage('home') },
   { path: 'detail', component: createPage('detail') }
@@ -46,6 +72,7 @@ const homeAndDetail = [
 
 afterEach(() => {
   pageState = null;
+  nestedState = null;
   cleanupRouters();
 });
 
@@ -132,7 +159,7 @@ describe('MicroRouterView — rendering', () => {
  * behaviour, not a target — a change in any of them is a render-path change and
  * must be deliberate.
  */
-describe('MicroRouterView — render cascade baseline (pre-Phase-2)', () => {
+describe('MicroRouterView — render cascade', () => {
   async function mountAtDetail(counter: ReturnType<typeof createUpdateCounter>) {
     const r = mountRouter({
       routes: homeAndDetail,
@@ -197,7 +224,7 @@ describe('MicroRouterView — render cascade baseline (pre-Phase-2)', () => {
     expect(counter.get('TransitionGroup')).toBe(0);
   });
 
-  test('baseline: one useMicroState mutation costs the page two renders', async () => {
+  test('one useMicroState mutation costs the page a single render', async () => {
     const counter = createUpdateCounter();
     const r = mountRouter({
       routes: [
@@ -217,11 +244,12 @@ describe('MicroRouterView — render cascade baseline (pre-Phase-2)', () => {
     pageState!.count.value = 5;
     await flush(3);
 
-    // Once for its own reactive change, then again when the owning RoutePage
-    // re-renders and hands it a freshly built v-bind object. That second render
-    // is the cost Phase 2 should target.
-    expect(counter.get('StatefulPage')).toBe(2);
-    expect(counter.get('RoutePage')).toBe(1);
+    // Once, for its own reactive change. The write-back used to echo straight
+    // back down as props — `persistRouteAttrs` persists without notifying, so the
+    // owning RoutePage no longer re-renders and the page is not handed data it
+    // just produced (baseline was 2 page renders and 1 RoutePage render).
+    expect(counter.get('StatefulPage')).toBe(1);
+    expect(counter.get('RoutePage')).toBe(0);
     expect(counter.get('MicroRouterView')).toBe(0);
     expect(counter.get('TransitionGroup')).toBe(0);
     expect(counter.get('Pagedetail')).toBe(0);
@@ -231,7 +259,147 @@ describe('MicroRouterView — render cascade baseline (pre-Phase-2)', () => {
     expect(document.querySelector('.stateful')?.textContent).toBe('5');
   });
 
-  test('baseline: a navigation re-renders the page stack three times', async () => {
+  test('a page mutation survives a remount even though it never notified', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: StatefulPage },
+        { path: 'detail', component: createPage('detail') }
+      ],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+    await r.store.push('detail');
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+    await flush();
+
+    pageState!.count.value = 7;
+    await flush(3);
+
+    // `push(-1, props)` bumps the target's componentKey, so `home` is torn down
+    // and set up again. Persist-without-notify must still mean persist: the
+    // fresh instance reads its state back out of the store.
+    pageState = null;
+    await r.store.push(-1, {});
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+    await flush(3);
+
+    expect(pageState).not.toBeNull();
+    expect(pageState!.count.value).toBe(7);
+    expect(document.querySelector('.stateful')?.textContent).toBe('7');
+  });
+
+  test('a nested mutation still syncs back without an explicit deep flag', async () => {
+    const r = mountRouter({
+      routes: [{ path: 'home', component: NestedStatePage }],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+
+    nestedState!.profile.value.name = 'b';
+    await flush(3);
+
+    // A shallow watch source here would drop this write silently and lose it on
+    // remount — see D3. Watching the `reactive()` object keeps it deep.
+    //
+    // The write-back spreads the page's `reactive()` state, so a nested value
+    // reaches the store as the page's own live object rather than a copy. That
+    // is pre-existing shape, not something this phase introduced — it is why
+    // this assertion compares content and not identity.
+    expect(r.store.getRouteAttrs('home')).toEqual({ profile: { name: 'b' } });
+  });
+
+  test('repeated mutations do not re-clone the stored attrs object (AC3)', async () => {
+    const r = mountRouter({
+      routes: [{ path: 'home', component: StatefulPage }],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+
+    pageState!.count.value = 1;
+    await flush(3);
+    const stored = r.store.getRouteAttrs('home');
+
+    pageState!.count.value = 2;
+    await flush(3);
+
+    // `persistRouteAttrs` merges in place, so the only clone left on this path
+    // is the one `useMicroState` makes of its own state — a second clone in the
+    // store would show up here as a new identity.
+    expect(r.store.getRouteAttrs('home')).toBe(stored);
+    expect(stored).toEqual({ count: 2 });
+  });
+
+  test('a page write-back does not wipe attrs the page never held', async () => {
+    const r = mountRouter({
+      routes: [{ path: 'home', component: StatefulPage }],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+
+    // Set after the page read its attrs, so the key exists in the store but not
+    // in the page's own state.
+    r.store.updateRouteAttrs('home', { serverTag: 'x' });
+    await flush(3);
+
+    pageState!.count.value = 3;
+    await flush(3);
+
+    // `persistRouteAttrs` merges. Replacing would silently drop everything the page
+    // did not happen to be carrying.
+    expect(r.store.getRouteAttrs('home')).toEqual({ serverTag: 'x', count: 3 });
+  });
+
+  test('the notifying attrs path still re-renders a mounted page', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: createPage('home') },
+        { path: 'detail', component: BadgePage }
+      ],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+
+    // Props handed to a page as it is pushed.
+    await r.store.push('detail', { badge: 1 });
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+    await flush();
+    expect(document.querySelector('.badge')?.textContent).toBe('1');
+
+    // And `updateRouteAttrs` on the page while it is mounted. Only the
+    // `useMicroState` write-back moved to `persistRouteAttrs`; this path must still
+    // notify, or `push(path, props)` and state restore stop reaching the page.
+    r.store.updateRouteAttrs('detail', { badge: 2 });
+    await flush(3);
+    expect(document.querySelector('.badge')?.textContent).toBe('2');
+    expect(r.store.getRouteAttrs('detail')).toEqual({ badge: 2 });
+  });
+
+  test('per-page inline styles carry the stack order and the route transition', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: createPage('home') },
+        { path: 'detail', component: createPage('detail'), transitionDuration: 250 }
+      ],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+    await r.store.push('detail');
+    await flush();
+
+    // The styles moved out of the `v-for` literal into a memoised computed;
+    // these are the three parts that had to survive the move.
+    const styles = r.wrapper.findAll('.route-page').map((p) => p.attributes('style') ?? '');
+    expect(styles).toHaveLength(2);
+    expect(styles[0]).toContain('z-index: 10');
+    expect(styles[1]).toContain('z-index: 11');
+    // Duration comes from the topmost route, and applies to every page in the stack.
+    for (const style of styles) {
+      expect(style).toContain('transform 250ms');
+      expect(style).toContain('opacity 250ms');
+    }
+  });
+
+  test('a navigation re-renders the page stack three times', async () => {
     const counter = createUpdateCounter();
     const r = mountRouter({
       routes: homeAndDetail,

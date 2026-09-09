@@ -64,13 +64,16 @@ export function useMicroState<T extends object>(defaults?: T): StateRefs<T> {
   }
   const state = reactive(initial) as T;
 
-  // Auto-sync changes back (flush: 'post' batches updates after render)
-  // Watch state directly — spread in callback only, not in source (avoids defeating Vue dirty-check)
+  // Auto-sync changes back (flush: 'post' batches updates after render).
+  // Watch state directly — spread in callback only, not in source (avoids
+  // defeating Vue dirty-check). A `reactive()` source is deep by definition, so
+  // no `deep` flag is needed; passing a shallow getter instead would silently
+  // drop nested mutations and lose them on remount.
   if (writeAttrs) {
     watch(
       state,
       (newState) => writeAttrs({ ...newState } as Record<string, unknown>),
-      { deep: true, flush: 'post' }
+      { flush: 'post' }
     );
   }
 

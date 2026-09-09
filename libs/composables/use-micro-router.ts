@@ -106,6 +106,7 @@ export function useGlobalMicroRouter(
     registerRoute: navigation.registerRoute,
     registerRoutes: navigation.registerRoutes,
     updateRouteAttrs: navigation.updateRouteAttrs,
+    persistRouteAttrs: navigation.persistRouteAttrs,
     getRouteAttrs: navigation.getRouteAttrs,
     preloadRoute: navigation.preloadRoute,
 

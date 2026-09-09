@@ -40,6 +40,12 @@ that never happened before.
   your `dist/`. Measured on a Vite 6 consumer: eager entry −2,753 B, total
   emitted +793 B.
 
+- `store.persistRouteAttrs(segment, attrs)` — merge attrs into a segment for
+  persistence only, without notifying reactive readers. `updateRouteAttrs` keeps
+  the merge-and-notify behaviour; use it whenever a mounted page must actually
+  see the change. Note `getRouteAttrs` returns the stored object itself, which
+  this merges into in place — copy it if you need a snapshot.
+
 ### Changed — consumer-visible
 
 - **The page stack is now wrapped in `<div class="micro-router__pages">`.**
@@ -69,6 +75,26 @@ that never happened before.
   to become `last`, so `active === last` never held for the control you could
   see and Tab escaped the dialog.
 
+- **`useMicroState` write-backs no longer re-render the page.** The watcher
+  synced mutations to the store through `updateRouteAttrs`, which notifies — and
+  the only reactive reader of that notification is the `v-bind` that hands the
+  attrs straight back to the page as props. Every mutation therefore cost the
+  page a second render carrying data it had just produced; on an input bound to
+  `useMicroState` that was one subtree diff per keystroke. The write-back now
+  goes through `persistRouteAttrs`, so a mutation costs one render instead of two.
+
+  The store still holds the latest state and a remounted page still reads it
+  back. What changed is that a *different* component watching the same segment's
+  attrs is no longer woken by a page's own write-back — nothing in the library
+  did that, and `push(path, props)` and state restore are unaffected.
+
+  This also reaches the exported `MICRO_ATTRS_WRITE_KEY`: **a page that injects
+  that writer directly now persists without notifying**, where it used to merge
+  and notify. The same key injected inside a dialog or a control still notifies,
+  because their props come from the definition objects rather than the attrs Map
+  and there was never an echo to cut. Call `updateRouteAttrs` if you need the
+  write to reach reactive readers from a page.
+
 ### Performance
 
 - Focus trap scans a focusable-candidate selector instead of every node in the
@@ -78,3 +104,8 @@ that never happened before.
   and binds `pointermove` only while a gesture is in progress.
 - `will-change: transform` while a page slide runs (not permanently — that
   wastes compositor memory on stacked pages that are not moving).
+- Per-page inline styles are memoised instead of rebuilt as a literal for every
+  page on every page-stack render (three per navigation). Measured over one
+  navigation on a four-page stack: 11 style objects and 11 transition strings
+  built inline, 4 and 1 memoised. Render counts are unchanged — this is
+  construction work, not a patch.

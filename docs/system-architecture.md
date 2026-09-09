@@ -73,6 +73,20 @@ selectedIndex.value = 2;
 // Auto-synced back to store via watcher (flush: 'post')
 ```
 
+The two directions use different store writers, and the difference is
+deliberate:
+
+| Direction | Writer | Notifies readers |
+|---|---|---|
+| Store → page (`push(path, props)`, state restore) | `updateRouteAttrs` | Yes |
+| Page → store (`useMicroState` write-back) | `persistRouteAttrs` | No |
+
+The write-back is an echo — the page already holds the value in its own
+`reactive()` state, and the only reactive reader of the attrs is the `v-bind`
+that hands them straight back down as props. Notifying there cost the page a
+second render per mutation. `persistRouteAttrs` merges into the stored object
+without touching the reactive key, so the state still survives a remount.
+
 ---
 
 ## Navigation Pipeline
@@ -350,6 +364,37 @@ const rootRouter = useMicroRouter({ root: true });
 - Child router fully independent: own navigation, dialogs, controls
 - Can register plugins to specific router instance
 - Cleanup on unmount (no parent leaks)
+
+### Attribute Fallthrough on the Host Page
+
+A page that hosts a nested router is still an ordinary Vue component, so the
+outer router's route attrs for that page reach it as **fallthrough attrs** and
+are applied to its root vnode — the nested `<MicroRouterView>`. Every write to
+the host page's attrs therefore re-renders the whole inner router, and because
+`MicroRouterView` is multi-root Vue also logs an extraneous-attrs warning and
+discards them.
+
+This is Vue's own semantics, not something the router can intercept from its
+side. The lever is in the host page:
+
+```vue
+<script setup lang="ts">
+// Either declare the props the outer router passes down…
+defineProps<{ visits?: number }>();
+// …or opt the host out of fallthrough entirely.
+defineOptions({ inheritAttrs: false });
+</script>
+
+<template>
+  <MicroRouterView nested :config="tabConfig" :plugins="[tabPlugin]" />
+</template>
+```
+
+Either form drops the inner router to zero re-renders per outer attrs write.
+Both halves are pinned in `tests/render-cascade-nested.test.ts`.
+
+A host page that renders the nested router inside a wrapper element (rather than
+as its root) is unaffected — the attrs land on that element instead.
 
 ---
 

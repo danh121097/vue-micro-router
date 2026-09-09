@@ -312,6 +312,33 @@ describe('useNavigation', () => {
     expect(nav.resolveRoutes.value).toHaveLength(0);
   });
 
+  test('persistRouteAttrs never retains or mutates the caller\'s object', () => {
+    const nav = createNav();
+    const mine = { a: 1 };
+
+    nav.persistRouteAttrs('home', mine);
+    // The store clones on the first write, so it neither holds the caller's
+    // object nor writes through it on the next merge. A `reactive()` argument
+    // would otherwise make the "does not notify" contract false.
+    expect(nav.getRouteAttrs('home')).not.toBe(mine);
+
+    nav.persistRouteAttrs('home', { b: 2 });
+    expect(mine).toEqual({ a: 1 });
+    expect(nav.getRouteAttrs('home')).toEqual({ a: 1, b: 2 });
+  });
+
+  test('persistRouteAttrs merges without replacing the entry', () => {
+    const nav = createNav();
+    nav.updateRouteAttrs('home', { fromStore: true });
+    const stored = nav.getRouteAttrs('home');
+
+    nav.persistRouteAttrs('home', { fromPage: 1 });
+
+    // In place, so the identity survives — that is the second clone AC3 drops.
+    expect(nav.getRouteAttrs('home')).toBe(stored);
+    expect(stored).toEqual({ fromStore: true, fromPage: 1 });
+  });
+
   test('async component loader is detected and wrapped', () => {
     const nav = createNav();
     const asyncLoader = () => import('../libs/core/types');
