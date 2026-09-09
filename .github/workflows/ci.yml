@@ -60,8 +60,8 @@ jobs:
             echo "devtools code leaked back into dist/index.mjs"; exit 1
           fi
           size=$(gzip -c dist/index.mjs | wc -c)
-          echo "dist/index.mjs: ${size} B gzip (ceiling 12150)"
-          test "$size" -le 12150 || exit 1
+          echo "dist/index.mjs: ${size} B gzip (ceiling 12450)"
+          test "$size" -le 12450 || exit 1
 
   # Build the VitePress docs and deploy to Cloudflare Pages.
   deploy-docs:

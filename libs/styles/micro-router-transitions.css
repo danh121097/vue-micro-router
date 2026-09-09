@@ -63,8 +63,18 @@
 }
 
 /* ── Navigation Lock — block page interactions during transition ─ */
-.micro-router--navigating,
-.micro-router--navigating * {
+/* F6: the `.micro-router--navigating *` half was dropped. `pointer-events:
+   none` on the ancestor already stops descendants receiving events — a child
+   only gets them back by re-enabling `pointer-events` itself, which no library
+   CSS does — and toggling a universal selector forced a style recalculation
+   across every descendant of every page, twice per navigation, while the
+   transform transition was running.
+
+   Consumer-visible: the `!important` existed to beat consumer CSS. A consumer
+   rule that re-enables `pointer-events` on a descendant used to lose and now
+   wins, so that descendant becomes clickable mid-transition. Noted in the
+   1.1.0 release notes. */
+.micro-router--navigating {
   pointer-events: none !important;
 }
 
