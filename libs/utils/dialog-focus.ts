@@ -26,10 +26,16 @@ let mobileKeyboardPrimed = false;
  * focusable filter, so it becomes `last` — and `active === last` never holds
  * for the control the user can actually see, letting Tab escape the dialog.
  *
- * `checkVisibility()` is the precise answer where it exists; `offsetParent` is
- * the cheap fallback. Deliberately *not* `getComputedStyle`, which forces a
- * style recalc per candidate on every Tab keypress and would hand back much of
- * what the selector change above just bought.
+ * `checkVisibility()` is the precise answer where it exists — Baseline since
+ * March 2024, so pre-17.4 Safari/iOS takes the fallback.
+ *
+ * `offsetParent` is that fallback, and it is not cheap: it forces layout, which
+ * is a heavier read than `getComputedStyle`. It is used anyway because it runs
+ * only for candidates that already cleared every attribute filter — a handful
+ * per dialog — and one layout flush per Tab keypress is worth a trap that does
+ * not leak. The two disagree on `content-visibility: hidden`, which
+ * `checkVisibility` drops and `offsetParent` keeps; the fallback has not been
+ * exercised on a real engine that lacks `checkVisibility`.
  */
 function isRendered(el: HTMLElement): boolean {
   const check = (el as { checkVisibility?: () => boolean }).checkVisibility;

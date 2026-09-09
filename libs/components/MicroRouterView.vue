@@ -79,7 +79,16 @@ if (props.config.gesture?.enabled) {
 </script>
 
 <template>
-  <TransitionGroup ref="pageContainerRef" :name="transitionName" :css="useCss">
+  <!-- `tag` is load-bearing: without it TransitionGroup renders a fragment,
+       whose `$el` is an anchor text node. The swipe-back gesture binds its
+       pointer listeners here, and a text node never receives pointer events. -->
+  <TransitionGroup
+    ref="pageContainerRef"
+    tag="div"
+    class="micro-router__pages"
+    :name="transitionName"
+    :css="useCss"
+  >
     <RoutePage
       v-for="(route, i) in resolveRoutes"
       :key="route.key || route.path"

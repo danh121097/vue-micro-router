@@ -86,6 +86,17 @@ describe('MicroRouterView — rendering', () => {
     await flush();
     // Back rebuilds the path from segments, so it is normalized to "/home".
     expect(r.store.activePage.value).toBe('home');
+
+    // The outgoing page stays mounted for the length of its leave transition —
+    // that is what a leave transition is. This used to read as 1 here only
+    // because the page stack was a fragment, so `findAll` never saw the leaving
+    // element; the stack is a real element now and the count is honest.
+    const leaving = r.wrapper.findAll('.route-page');
+    expect(leaving).toHaveLength(2);
+    expect(leaving[1]!.classes()).toContain('page-slide-leave-active');
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await flush();
     expect(r.wrapper.findAll('.route-page')).toHaveLength(1);
     expect(r.wrapper.find('.page--detail').exists()).toBe(false);
   });

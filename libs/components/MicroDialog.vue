@@ -210,6 +210,11 @@ onBeforeUnmount(() => {
         class="micro-dialog-backdrop"
         :class="dialog.closing && 'micro-dialog-backdrop--closing'"
       />
+      <!-- The `mousedown.self` below is defensive: `.micro-dialog` is
+           `pointer-events: none`, so it is never a hit-test target and `.self`
+           cannot match here in a browser. The portal handler above is the one
+           that stops focus escaping; this only matters if a consumer re-enables
+           pointer-events on the wrapper. -->
       <div
         ref="wrapperRef"
         role="dialog"

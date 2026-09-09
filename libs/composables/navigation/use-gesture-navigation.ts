@@ -60,34 +60,62 @@ export function useGestureNavigation(
   let frameHandle: number | null = null;
 
   /**
+   * The settle timer that resets inline styles once the release animation ends.
+   *
+   * Tracked so it can be cancelled: a second gesture started inside that window
+   * would otherwise have its page's styles wiped and `currentPage` nulled by the
+   * previous gesture's timer, and a timer left running past unmount would call
+   * `goBack()` on a store whose view is gone.
+   */
+  let settleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearSettleTimer() {
+    if (settleTimer === null) return;
+    clearTimeout(settleTimer);
+    settleTimer = null;
+  }
+
+  function scheduleSettle(fn: () => void, ms: number) {
+    clearSettleTimer();
+    settleTimer = setTimeout(() => {
+      settleTimer = null;
+      fn();
+    }, ms);
+  }
+
+  /**
    * The element the listeners are bound to, kept so unbinding uses the same one
    * even if the ref has already been torn down.
    */
   let boundEl: HTMLElement | null = null;
 
   /**
-   * Resolve the actual DOM element — handles raw HTMLElement refs, Vue
-   * component instance refs (`$el`), and fragment roots.
+   * Resolve the actual DOM element — handles raw HTMLElement refs and Vue
+   * component instance refs (`$el`).
    *
-   * The container this is given is a tag-less `<TransitionGroup>`, which
-   * renders a fragment: its `$el` is the fragment's anchor **text node**, not an
-   * element. Pointer events never reach a text node, so binding there meant the
-   * swipe-back gesture could not fire at all — for any consumer, in any browser.
-   * The element that actually contains the pages is that anchor's parent.
+   * `MicroRouterView` gives its `<TransitionGroup>` a `tag`, so `$el` is the
+   * page-stack element. Without one, TransitionGroup renders a fragment and
+   * `$el` is the fragment's anchor **text node** — which is an `EventTarget`,
+   * so binding succeeds silently, but a text node never receives pointer
+   * events and the gesture could not fire at all. Falling back to the anchor's
+   * parent is not a fix: that is the element the consumer mounted the app into,
+   * which pulls in sibling layers and, for nested routers, the wrong pages.
    */
   function resolveElement(): HTMLElement | null {
     const ref = ctx.containerRef.value;
     if (!ref) return null;
     const node = ('$el' in ref ? (ref as any).$el : ref) as Node | null;
-    if (!node) return null;
-    if (node.nodeType !== 1) return node.parentElement;
+    if (!node || node.nodeType !== 1) return null;
     return node as HTMLElement;
   }
 
   function getPages(): { current: HTMLElement | null; previous: HTMLElement | null } {
     const container = resolveElement();
     if (!container) return { current: null, previous: null };
-    const pages = container.querySelectorAll<HTMLElement>('.route-page');
+    // `:scope >` matters: a page hosting a nested router contains that router's
+    // pages too, and an unscoped query would hand this router the inner
+    // router's page as `current` and its own host page as `previous`.
+    const pages = container.querySelectorAll<HTMLElement>(':scope > .route-page');
     if (pages.length < 2) return { current: pages[pages.length - 1] ?? null, previous: null };
     return {
       current: pages[pages.length - 1]!,
@@ -100,6 +128,7 @@ export function useGestureNavigation(
     const { current, previous } = getPages();
     if (!current) return;
 
+    clearSettleTimer();
     tracking = true;
     startX = e.clientX;
     startY = e.clientY;
@@ -164,7 +193,13 @@ export function useGestureNavigation(
   }
 
   function onPointerUp(e: PointerEvent) {
-    if (!tracking || !currentPage) { unbindDragListeners(); return; }
+    if (!tracking || !currentPage) {
+      // Leaving `tracking` set here would strand the gesture in a half-armed
+      // state until the next pointerdown happened to clear it.
+      tracking = false;
+      unbindDragListeners();
+      return;
+    }
     cancelPendingFrame();
     unbindDragListeners();
     // Validate DOM refs are still connected (Vue may have re-rendered)
@@ -186,7 +221,7 @@ export function useGestureNavigation(
         prevPage.style.transform = 'translateX(0)';
       }
       // Execute back navigation after animation
-      setTimeout(() => {
+      scheduleSettle(() => {
         resetStyles();
         ctx.goBack();
       }, 200);
@@ -198,7 +233,7 @@ export function useGestureNavigation(
         prevPage.style.transition = 'transform 0.2s ease-out';
         prevPage.style.transform = 'translateX(-20%)';
       }
-      setTimeout(resetStyles, 200);
+      scheduleSettle(resetStyles, 200);
     }
 
     tracking = false;
@@ -216,7 +251,7 @@ export function useGestureNavigation(
       prevPage.style.transition = 'transform 0.15s ease-out';
       prevPage.style.transform = 'translateX(-20%)';
     }
-    setTimeout(resetStyles, 150);
+    scheduleSettle(resetStyles, 150);
     tracking = false;
   }
 
@@ -264,6 +299,7 @@ export function useGestureNavigation(
 
   onBeforeUnmount(() => {
     cancelPendingFrame();
+    clearSettleTimer();
     if (!boundEl?.removeEventListener) return;
     boundEl.removeEventListener('pointerdown', onPointerDown);
     unbindDragListeners();
