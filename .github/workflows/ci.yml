@@ -147,13 +147,25 @@ jobs:
       # under the "# Changelog" title, preserving all curated history below.
       # Pushed with GITHUB_TOKEN so it does not re-trigger CI (plus [skip ci]).
       #
-      # Non-fatal on purpose: master is a protected branch and github-actions[bot]
-      # has no bypass, so this push is rejected with "Changes must be made through
-      # a pull request". That used to abort the job and take the GitHub Release
-      # with it — the release is the part that matters, so it no longer waits on
-      # this. When the push is rejected, commit website/changelog.md by hand (the
-      # same `git-cliff` invocation below reproduces the section), or give the bot
-      # a branch-protection bypass to restore the automation.
+      # Expected to fail, and non-fatal on purpose. master requires a pull
+      # request and github-actions[bot] cannot be exempted: bypass actors for a
+      # GitHub App are an organization-only feature, and this repo is owned by a
+      # user, so the API rejects it —
+      #   422 "Actor GitHub Actions integration must be part of the ruleset
+      #        source or owner organization"
+      # Classic branch protection on a personal repo has no equivalent either.
+      # The push is therefore rejected every release. It used to abort the job
+      # and take "Create GitHub Release" down with it; the release is the part
+      # that matters, so it no longer waits on this.
+      #
+      # Commit website/changelog.md by hand after each release — the same
+      # git-cliff invocation below reproduces the section:
+      #   bunx git-cliff@latest --unreleased \
+      #     --tag "v$(node -p 'require("./package.json").version')" \
+      #     --config cliff.toml
+      # Automating it again needs the workflow to push as an admin (a PAT in
+      # place of GITHUB_TOKEN), which was weighed and declined: a long-lived
+      # credential with write access to a public repo, to save one command.
       - name: Update changelog
         if: steps.check.outputs.exists == 'false'
         continue-on-error: true
