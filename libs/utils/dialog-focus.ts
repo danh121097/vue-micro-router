@@ -1,4 +1,15 @@
 const FOCUSABLE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
+/**
+ * Candidate selector for the focusable scan.
+ *
+ * The scan used to be `querySelectorAll('*')` filtered down — every node in the
+ * dialog, on every Tab keypress and on up to 12 animation frames while
+ * autofocus settles. This narrows the candidate set to nodes that could
+ * plausibly be focusable; {@link isDialogFocusableElement} stays the
+ * correctness filter over that much smaller list, so the result is identical.
+ */
+const FOCUSABLE_CANDIDATE_SELECTOR =
+  'a[href],button,input,select,textarea,[tabindex]';
 const AUTOFOCUS_TAGS = new Set(['INPUT', 'TEXTAREA']);
 const AUTOFOCUS_SELECTOR = 'input[autofocus],textarea[autofocus]';
 const MOBILE_USER_AGENT = /iPhone|iPad|iPod|Android/i;
@@ -8,20 +19,43 @@ let mobilePrimeInput: HTMLInputElement | null = null;
 let mobilePrimeTimer: ReturnType<typeof setTimeout> | null = null;
 let mobileKeyboardPrimed = false;
 
+/**
+ * Whether the element is rendered at all.
+ *
+ * A `v-show`-hidden trailing control is still in the DOM and still matches the
+ * focusable filter, so it becomes `last` — and `active === last` never holds
+ * for the control the user can actually see, letting Tab escape the dialog.
+ *
+ * `checkVisibility()` is the precise answer where it exists; `offsetParent` is
+ * the cheap fallback. Deliberately *not* `getComputedStyle`, which forces a
+ * style recalc per candidate on every Tab keypress and would hand back much of
+ * what the selector change above just bought.
+ */
+function isRendered(el: HTMLElement): boolean {
+  const check = (el as { checkVisibility?: () => boolean }).checkVisibility;
+  if (typeof check === 'function') return check.call(el);
+  return el.offsetParent !== null;
+}
+
 function isDialogFocusableElement(el: HTMLElement): boolean {
   if (!FOCUSABLE_TAGS.has(el.tagName) && !el.hasAttribute('tabindex')) return false;
   if (el.tagName === 'A' && !el.hasAttribute('href')) return false;
-  if (el.hidden || el.closest('[hidden],[inert]')) return false;
-  if (el.getAttribute('aria-hidden') === 'true') return false;
+  // `aria-hidden` is checked on ancestors too, like `hidden` and `inert`. It
+  // used to be read off the element alone, so a control inside an
+  // `aria-hidden="true"` subtree — hidden from assistive technology — stayed in
+  // the Tab order of the trap. Beyond F5's "identical behaviour": a defect in
+  // the same filter, found by the exclusion test written for it.
+  if (el.hidden || el.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
   if (el.getAttribute('tabindex') === '-1') return false;
   if (el.hasAttribute('disabled')) return false;
   if (el instanceof HTMLInputElement && el.type === 'hidden') return false;
+  if (!isRendered(el)) return false;
   return true;
 }
 
 export function getDialogFocusableElements(root: HTMLElement): HTMLElement[] {
   return Array.from(
-    root.querySelectorAll<HTMLElement>('*')
+    root.querySelectorAll<HTMLElement>(FOCUSABLE_CANDIDATE_SELECTOR)
   ).filter(isDialogFocusableElement);
 }
 

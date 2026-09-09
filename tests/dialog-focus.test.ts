@@ -121,3 +121,125 @@ describe('dialog focus helpers', () => {
     expect(document.body.querySelector('input[aria-label="Keyboard input"]')).toBeNull();
   });
 });
+
+/**
+ * F5 — the focusable scan used to be `querySelectorAll('*')` filtered down,
+ * running on every Tab keypress and on up to 12 animation frames while
+ * autofocus settles. These pin the narrowed selector against the old
+ * behaviour rather than trusting that the filter covers the same ground.
+ */
+describe('focusable scan (F5)', () => {
+  /**
+   * The pre-F5 implementation, kept as the oracle.
+   *
+   * It carries the `aria-hidden` ancestor fix that landed alongside F5, so this
+   * comparison isolates exactly one variable: `'*'` versus the narrowed
+   * candidate selector.
+   */
+  function scanEveryNode(root: HTMLElement): HTMLElement[] {
+    const FOCUSABLE_TAGS = new Set(['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA']);
+    return Array.from(root.querySelectorAll<HTMLElement>('*')).filter((el) => {
+      if (!FOCUSABLE_TAGS.has(el.tagName) && !el.hasAttribute('tabindex')) return false;
+      if (el.tagName === 'A' && !el.hasAttribute('href')) return false;
+      if (el.hidden || el.closest('[hidden],[inert],[aria-hidden="true"]')) return false;
+      if (el.getAttribute('tabindex') === '-1') return false;
+      if (el.hasAttribute('disabled')) return false;
+      if (el instanceof HTMLInputElement && el.type === 'hidden') return false;
+      return true;
+    });
+  }
+
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  test('a 500-node dialog yields exactly what scanning every node did', () => {
+    const root = setupRoot();
+    const parts: string[] = [];
+    for (let i = 0; i < 100; i++) {
+      parts.push(
+        `<div><span>text ${i}</span><p>copy</p>`,
+        `<button>btn ${i}</button>`,
+        i % 3 === 0 ? `<input disabled />` : `<input />`,
+        i % 5 === 0 ? `<a>no href</a>` : `<a href="#">link ${i}</a>`,
+        `<div tabindex="${i % 7 === 0 ? '-1' : '0'}">tab ${i}</div>`,
+        `<section aria-hidden="true"><button>hidden ${i}</button></section>`,
+        `</div>`
+      );
+    }
+    root.innerHTML = parts.join('');
+    expect(root.querySelectorAll('*').length).toBeGreaterThan(500);
+
+    const narrowed = getDialogFocusableElements(root);
+    const everyNode = scanEveryNode(root);
+
+    expect(narrowed).toEqual(everyNode);
+    expect(narrowed.length).toBeGreaterThan(0);
+  });
+
+  test('the narrowed selector still excludes each disqualifying case', () => {
+    const root = setupRoot();
+    root.innerHTML = [
+      '<button>keep</button>',
+      '<button disabled>drop</button>',
+      '<a href="#">keep</a>',
+      '<a>drop</a>',
+      '<input type="hidden" />',
+      '<input hidden />',
+      '<div tabindex="0">keep</div>',
+      '<div tabindex="-1">drop</div>',
+      '<div aria-hidden="true"><button>drop</button></div>',
+      '<button aria-hidden="true">drop</button>',
+      '<div inert><button>drop</button></div>',
+      '<span>drop</span>'
+    ].join('');
+
+    const labels = getDialogFocusableElements(root).map(
+      (el) => el.textContent || el.tagName
+    );
+    expect(labels).toEqual(['keep', 'keep', 'keep']);
+  });
+});
+
+/**
+ * F5b — a `v-show`-hidden trailing control is still in the DOM and still
+ * matches every other filter, so it becomes `last` and `active === last` never
+ * holds for the control the user can see, letting Tab escape.
+ *
+ * happy-dom implements neither `checkVisibility()` nor `offsetParent`, so the
+ * real hiding cannot be reproduced here. These drive `checkVisibility` directly
+ * to pin that the check is consulted at all — the fallback path is left to a
+ * real browser.
+ */
+describe('rendered check (F5b)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  test('an element reporting itself invisible is dropped', () => {
+    const root = setupRoot();
+    root.innerHTML = '<button>first</button><button>last</button>';
+    const [first, last] = Array.from(root.querySelectorAll('button'));
+
+    expect(getDialogFocusableElements(root)).toEqual([first!, last!]);
+
+    Object.defineProperty(last!, 'checkVisibility', {
+      configurable: true,
+      value: () => false
+    });
+
+    expect(getDialogFocusableElements(root)).toEqual([first!]);
+  });
+
+  test('an element reporting itself visible is kept', () => {
+    const root = setupRoot();
+    root.innerHTML = '<button>only</button>';
+    const button = root.querySelector('button')!;
+    Object.defineProperty(button, 'checkVisibility', {
+      configurable: true,
+      value: () => true
+    });
+
+    expect(getDialogFocusableElements(root)).toEqual([button]);
+  });
+});
