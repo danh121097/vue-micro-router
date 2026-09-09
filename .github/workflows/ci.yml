@@ -146,8 +146,17 @@ jobs:
       # Generate the new version's section from conventional commits and inject it
       # under the "# Changelog" title, preserving all curated history below.
       # Pushed with GITHUB_TOKEN so it does not re-trigger CI (plus [skip ci]).
+      #
+      # Non-fatal on purpose: master is a protected branch and github-actions[bot]
+      # has no bypass, so this push is rejected with "Changes must be made through
+      # a pull request". That used to abort the job and take the GitHub Release
+      # with it — the release is the part that matters, so it no longer waits on
+      # this. When the push is rejected, commit website/changelog.md by hand (the
+      # same `git-cliff` invocation below reproduces the section), or give the bot
+      # a branch-protection bypass to restore the automation.
       - name: Update changelog
         if: steps.check.outputs.exists == 'false'
+        continue-on-error: true
         run: |
           bunx git-cliff@latest --unreleased --tag "${{ steps.version.outputs.version }}" --config cliff.toml > /tmp/section.md
           if [ ! -s /tmp/section.md ]; then
