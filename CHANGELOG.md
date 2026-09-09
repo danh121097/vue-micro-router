@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — unreleased
+## 1.1.0 — 2026-09-09
 
 Two features shipped in earlier releases without ever working. Both are fixed
 here, so the visible change for most consumers is that things start happening
