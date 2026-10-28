@@ -128,6 +128,73 @@ describe('MicroRouterView — rendering', () => {
     expect(r.wrapper.find('.page--detail').exists()).toBe(false);
   });
 
+  test('replace slides the new page in over the old one, which stays put', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: createPage('home') },
+        { path: 'welcome', component: BadgePage },
+        { path: 'quiz', component: createPage('quiz') }
+      ],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+    await r.store.push('welcome', { badge: 5 });
+    await flush();
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+
+    await r.store.replace('quiz');
+    await flush();
+    expect(r.store.activePath.value).toBe('/home/quiz');
+
+    // home underneath, welcome leaving, quiz entering.
+    const pages = r.wrapper.findAll('.route-page');
+    expect(pages).toHaveLength(3);
+    const leaving = pages.find((p) => p.find('.badge').exists())!;
+    const entering = pages.find((p) => p.find('.page--quiz').exists())!;
+    expect(leaving.classes()).toContain('page-replace-leave-active');
+    expect(leaving.classes()).not.toContain('page-slide-leave-active');
+    expect(entering.classes()).toContain('page-replace-enter-active');
+    // Same z-index, so the new page is on top only because it comes later in the DOM.
+    expect(pages.indexOf(entering)).toBeGreaterThan(pages.indexOf(leaving));
+    // The replaced page stays visible while it is covered; clearing its stored
+    // attrs must not reset what it shows.
+    expect(leaving.find('.badge').text()).toBe('5');
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await flush();
+    expect(r.wrapper.findAll('.route-page')).toHaveLength(2);
+    expect(r.wrapper.find('.badge').exists()).toBe(false);
+
+    // Back from the replaced page still slides out to the right.
+    await r.store.push(-1);
+    await flush();
+    expect(r.store.activePage.value).toBe('home');
+    const back = r.wrapper.findAll('.route-page');
+    expect(back[1]!.classes()).toContain('page-slide-leave-active');
+  });
+
+  test('a push after a replace uses the slide again', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: createPage('home') },
+        { path: 'welcome', component: createPage('welcome') },
+        { path: 'quiz', component: createPage('quiz') },
+        { path: 'result', component: createPage('result') }
+      ],
+      stepDelay: STEP_DELAY
+    });
+    await flush();
+    await r.store.push('welcome');
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+    await r.store.replace('quiz');
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY * 3));
+
+    await r.store.push('result');
+    await flush();
+    const entering = r.wrapper.findAll('.route-page').find((p) => p.find('.page--result').exists())!;
+    expect(entering.classes()).toContain('page-slide-enter-active');
+  });
+
   test('background page is marked deactivate, foreground is not', async () => {
     const r = mountRouter({ routes: homeAndDetail, stepDelay: STEP_DELAY });
     await flush();

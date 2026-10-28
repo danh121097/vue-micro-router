@@ -25,10 +25,12 @@ import { useAudioManager } from './use-audio-manager';
 import type {
   RouteMap,
   TypedPush,
+  TypedReplace,
   ExtractRoutePaths,
   ExtractDialogPaths,
   ExtractControlNames,
   PluginTypedPush,
+  PluginTypedReplace,
   PluginTypedStepWisePush,
   PluginTypedStepWiseBack,
   PluginTypedOpenDialog,
@@ -89,10 +91,15 @@ export function useGlobalMicroRouter(
     fromPage: navigation.fromPage,
     toPage: navigation.toPage,
     isNavigating: navigation.isNavigating,
+    navigationKind: navigation.navigationKind,
     resolveRoutes: navigation.resolveRoutes,
     push: async (destination, props?) => {
       await navigation.push(destination, props);
       // Sync BGM update in user gesture context (critical for autoplay policy)
+      if (audio) void audio.updateBackgroundMusic(navigation.activePath.value, navigation.routes);
+    },
+    replace: async (segment, props?) => {
+      await navigation.replace(segment, props);
       if (audio) void audio.updateBackgroundMusic(navigation.activePath.value, navigation.routes);
     },
     stepWisePush: async (targetPath, props?) => {
@@ -259,9 +266,10 @@ export function useGlobalMicroRouter(
 /** Typed store from manual RouteMap — push() validates route names + props */
 export type TypedMicroRouterStore<T extends RouteMap> = Omit<
   MicroRouterStore,
-  'push'
+  'push' | 'replace'
 > & {
   push: TypedPush<T>;
+  replace: TypedReplace<T>;
 };
 
 /**
@@ -270,13 +278,14 @@ export type TypedMicroRouterStore<T extends RouteMap> = Omit<
  */
 export type PluginTypedMicroRouterStore<T> = Omit<
   MicroRouterStore,
-  | 'push' | 'stepWisePush' | 'stepWiseBack'
+  | 'push' | 'replace' | 'stepWisePush' | 'stepWiseBack'
   | 'openDialog' | 'closeDialog' | 'toggleControl'
   | 'activePage' | 'fromPage' | 'toPage'
   | 'activeDialog' | 'fromDialog' | 'toDialog'
   | 'currentControl'
 > & {
   push: PluginTypedPush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
+  replace: PluginTypedReplace<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
   stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<T>, RegisteredRouteAttrs>;
   stepWiseBack: PluginTypedStepWiseBack;
   openDialog: PluginTypedOpenDialog<ExtractDialogPaths<T>, RegisteredDialogAttrs>;

@@ -22,6 +22,23 @@ await push(-1);               // home/settings → home
 await push(-1, { reset: true });
 ```
 
+## Replacing the Top Page
+
+When a page takes the place of the top page — a wizard step, or a quiz going welcome → run → result — use `replace()`. The new page slides in over the old one, which stays put, so the swap reads as forward. Back from the new page returns to the page under it.
+
+```ts
+const { replace } = useMicroRouter();
+
+// home/welcome → home/quiz  (welcome is gone; back goes to home)
+await replace('quiz', { quizId: 7 });
+```
+
+- Takes a route segment name only — not a number or an absolute path.
+- Runs the same lock, guards (`beforeEach`, `beforeEnter`, the old page's `beforeLeave`) and `afterEach` as `push()`.
+- Clears the replaced page's attrs, and with history enabled overwrites the current entry instead of adding one.
+- No-op when the segment is already the top page; ignored with a warning when it already sits lower in the stack (a path cannot hold one segment twice).
+- With the `slide` transition the pages use `page-replace-*` classes; `fade` and `none` behave as for `push()`. `store.navigationKind` (`'push' | 'back' | 'replace'`) reports the kind of the last navigation.
+
 ## Navigation with Props
 
 Pass data to pages via `push()` and read it with `useMicroState()`:
@@ -125,7 +142,7 @@ await router.historyForward?.();
 await router.historyGo?.(-2); // go back 2 entries
 ```
 
-History truncates forward entries on new push (browser behavior).
+History truncates forward entries on new push (browser behavior). `replace()` overwrites the current entry instead of adding one.
 
 ## Type-Safe Routes
 

@@ -38,6 +38,28 @@ describe('navigation lock (F6, AC8)', () => {
   });
 });
 
+describe('page replace transition', () => {
+  /** Declarations of the first rule whose selector list contains `selector`. */
+  function block(selector: string): string {
+    const clean = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = clean
+      .split('}')
+      .find((r) => (r.split('{')[0] ?? '').split(',').map((s) => s.trim()).includes(selector));
+    return rule?.split('{')[1] ?? '';
+  }
+
+  test('the new page enters from the right, like a push', () => {
+    expect(block('.page-replace-enter-from')).toContain('transform: translateX(100%)');
+  });
+
+  test('the replaced page does not slide out like a back', () => {
+    // `page-slide-leave-to` moves the leaving page to translateX(100%) — the
+    // back direction. A replace must not, or the swap reads as going back.
+    expect(selectors(css)).not.toContain('.page-replace-leave-to');
+    expect(block('.page-replace-leave-active')).not.toContain('transform');
+  });
+});
+
 describe('page slide compositor hint (F9)', () => {
   test('will-change is on the active classes, not on .route-page', () => {
     const active = css.split('.page-slide-leave-active {')[1]!.split('}')[0]!;

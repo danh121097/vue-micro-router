@@ -43,6 +43,26 @@
   transform: translateX(100%);
 }
 
+/* ── Page Replace ────────────────────────────────── */
+/* A replace swaps the top page: the new page slides in from the right over the
+   old one, which stays put and takes the covered-page overlay, as a page under
+   a push does. The new page paints on top because it is inserted after the
+   leaving one in the DOM at the same z-index. The duration and easing come
+   from the inline `transition` in `MicroRouterView`, as for the slide.
+   The leaving page has no transform change, so its own `transitionend` never
+   fires: Vue removes it on the transition's timeout (the page duration). */
+.page-replace-enter-active {
+  will-change: transform;
+}
+
+.page-replace-enter-from {
+  transform: translateX(100%);
+}
+
+.page-replace-leave-active::before {
+  opacity: 1;
+}
+
 /* ── Page Fade ──────────────────────────────────── */
 .page-fade-enter-active,
 .page-fade-leave-active {

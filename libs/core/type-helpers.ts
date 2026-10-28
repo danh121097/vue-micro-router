@@ -38,6 +38,12 @@ export interface TypedPush<T extends RouteMap> {
   (destination: `/${string}`, props?: Record<string, unknown>): Promise<void>;
 }
 
+/** Typed replace overloads for manual RouteMap — route segment names only */
+export interface TypedReplace<T extends RouteMap> {
+  (segment: RoutesWithoutProps<T>): Promise<void>;
+  <K extends RoutesWithProps<T>>(segment: K, props: T[K]): Promise<void>;
+}
+
 // ── Plugin Type Extraction (infer approach) ──────────────────────────────────
 
 /** Extract route path literals from a plugin config type */
@@ -88,6 +94,11 @@ export interface PluginTypedPush<Routes extends string, AttrsMap = {}> {
   <K extends Routes>(destination: K, ...args: PropsArgs<K, AttrsMap>): Promise<void>;
   (destination: number, props?: Record<string, unknown>): Promise<void>;
   (destination: `/${string}`, props?: Record<string, unknown>): Promise<void>;
+}
+
+/** Replace takes a route segment name only — no back step, no absolute path */
+export interface PluginTypedReplace<Routes extends string, AttrsMap = {}> {
+  <K extends Routes>(segment: K, ...args: PropsArgs<K, AttrsMap>): Promise<void>;
 }
 
 /**
@@ -212,13 +223,14 @@ export type ResolvedMicroRouterStore =
   HasRegisteredPlugin extends true
     ? Omit<
         import('./types').MicroRouterStore,
-        | 'push' | 'stepWisePush' | 'stepWiseBack'
+        | 'push' | 'replace' | 'stepWisePush' | 'stepWiseBack'
         | 'openDialog' | 'closeDialog' | 'toggleControl'
         | 'activePage' | 'fromPage' | 'toPage'
         | 'activeDialog' | 'fromDialog' | 'toDialog'
         | 'currentControl'
       > & {
         push: PluginTypedPush<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs, RegisteredRouteAttrs>;
+        replace: PluginTypedReplace<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs, RegisteredRouteAttrs>;
         stepWisePush: PluginTypedStepWisePush<ExtractRoutePaths<RegisteredPlugin> | keyof RegisteredRouteAttrs, RegisteredRouteAttrs>;
         stepWiseBack: PluginTypedStepWiseBack;
         openDialog: PluginTypedOpenDialog<ExtractDialogPaths<RegisteredPlugin> | keyof RegisteredDialogAttrs, RegisteredDialogAttrs>;
@@ -233,7 +245,8 @@ export type ResolvedMicroRouterStore =
         currentControl: import('vue').ComputedRef<ExtractControlNames<RegisteredPlugin> | keyof RegisteredControlAttrs>;
       }
     : HasRegisteredRouteMap extends true
-      ? Omit<import('./types').MicroRouterStore, 'push'> & {
+      ? Omit<import('./types').MicroRouterStore, 'push' | 'replace'> & {
           push: TypedPush<RegisteredRouteMap>;
+          replace: TypedReplace<RegisteredRouteMap>;
         }
       : import('./types').MicroRouterStore;

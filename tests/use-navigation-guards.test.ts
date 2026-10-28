@@ -191,6 +191,46 @@ describe('Navigation Guards', () => {
     expect(afterHook).not.toHaveBeenCalled();
   });
 
+  test('replace runs beforeEach, beforeEnter, beforeLeave and afterEach', async () => {
+    const guard = mock(() => true);
+    const afterHook = mock(() => {});
+    const beforeEnter = mock(() => true);
+    const beforeLeave = mock(() => true);
+    const nav = createNav({ guards: { beforeEach: [guard], afterEach: [afterHook] } });
+    nav.registerRoute({ path: 'home', component: { render: () => null } } as any);
+    nav.registerRoute({ path: 'welcome', component: { render: () => null }, beforeLeave } as any);
+    nav.registerRoute({ path: 'quiz', component: { render: () => null }, beforeEnter } as any);
+
+    await nav.push('welcome');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.replace('quiz');
+
+    expect(guard).toHaveBeenLastCalledWith('/home/quiz', '/home/welcome');
+    expect(beforeEnter).toHaveBeenCalledWith('/home/quiz', '/home/welcome');
+    expect(beforeLeave).toHaveBeenCalledWith('/home/quiz', '/home/welcome');
+    expect(afterHook).toHaveBeenLastCalledWith('/home/quiz', '/home/welcome');
+  });
+
+  test('a rejecting guard cancels a replace', async () => {
+    const afterHook = mock(() => {});
+    const nav = createNav({
+      guards: { beforeEach: [(to) => !to.includes('quiz')], afterEach: [afterHook] }
+    });
+    nav.registerRoute({ path: 'home', component: { render: () => null } } as any);
+    nav.registerRoute({ path: 'welcome', component: { render: () => null } } as any);
+    nav.registerRoute({ path: 'quiz', component: { render: () => null } } as any);
+
+    await nav.push('welcome');
+    await new Promise((r) => setTimeout(r, 20));
+    afterHook.mockClear();
+    await nav.replace('quiz');
+
+    expect(nav.activePath.value).toBe('/home/welcome');
+    expect(nav.navigationKind.value).toBe('push');
+    expect(nav.isNavigating.value).toBe(false);
+    expect(afterHook).not.toHaveBeenCalled();
+  });
+
   test('guards work with back navigation', async () => {
     const guard = mock(() => true);
     const nav = createNav({ guards: { beforeEach: [guard] } });

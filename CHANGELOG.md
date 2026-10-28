@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **`replace(segment, props?)`** on the store and the `useMicroRouter()`
+  return — swap the top page for another route and animate forward.
+  `/home/welcome` → `replace('quiz')` → `/home/quiz`; back from `quiz` returns
+  to `home`. Until now the only way was an absolute `push('/home/quiz')`,
+  which plays the back slide on the leaving page, so the swap looked like going
+  back.
+  - Under `slide` the new page enters from the right with `page-replace-*`
+    classes while the old page stays put under the covered-page overlay.
+    `fade` and `none` behave as for `push()`.
+  - Same lock, guards (`beforeEach`, `beforeEnter`, the old page's
+    `beforeLeave`), `afterEach`, adjacent preload and BGM update as `push()`.
+  - Clears the replaced page's attrs. With history enabled, the current entry
+    is overwritten (and forward entries dropped) instead of a new one added.
+  - Takes a route segment name only, typed through `Register` and
+    `RouteAttrsMap` like `push()` (`PluginTypedReplace`, `TypedReplace`). A
+    no-op for the top page; ignored with a console warning for a segment
+    already lower in the stack.
+  - Also animates a replace at the root (a single-page stack), which an
+    absolute push there never did.
+- `store.navigationKind` — `'push' | 'back' | 'replace'`, the kind of the last
+  navigation. Exported type `NavigationKind`.
+
+### Changed — consumer-visible
+
+- **`MicroRouterStore` and `NavigationState` have two new required members**,
+  `replace` and `navigationKind`. Code that builds either as an object literal (a
+  hand-written mock, say) must add them; code that only reads the store, or
+  casts with `as unknown as MicroRouterStore`, is unaffected.
+- **A replace does not use `page-slide-*` classes.** Consumer CSS that targets
+  `.page-slide-enter-*` / `.page-slide-leave-*` does not apply to a replace;
+  target `.page-replace-*` for it.
+
+`push()` is unchanged for every existing call.
+
 ## 1.1.2 — 2026-09-09
 
 *(Released as 1.1.2. The 1.1.0 and 1.1.1 version bumps were never published —

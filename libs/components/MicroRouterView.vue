@@ -31,6 +31,7 @@ const {
   fromPath,
   toPath,
   isNavigating,
+  navigationKind,
   closeDialog
 } = store;
 
@@ -53,9 +54,16 @@ const activeTransition = computed(() => {
   return topRoute?.transition ?? 'slide';
 });
 
+/**
+ * A replace swaps the top page, so the leaving page is not going back: under
+ * `slide` it gets `page-replace` (stays put while the new page slides in over
+ * it) instead of `page-slide` (slides out to the right). Fade and none are
+ * direction-free and stay as they are.
+ */
 const transitionName = computed(() => {
   if (activeTransition.value === 'none') return '';
-  return activeTransition.value === 'fade' ? 'page-fade' : 'page-slide';
+  if (activeTransition.value === 'fade') return 'page-fade';
+  return navigationKind.value === 'replace' ? 'page-replace' : 'page-slide';
 });
 
 const transitionDuration = computed(() => {
@@ -64,8 +72,12 @@ const transitionDuration = computed(() => {
   return activeTransition.value === 'fade' ? 300 : 500;
 });
 
+// A replace at the root shares no segment with the page it swaps out, yet it
+// is still a navigation the user should see — so it animates regardless.
 const useCss = computed(
-  () => hasSharedSegments.value && activeTransition.value !== 'none'
+  () =>
+    (hasSharedSegments.value || navigationKind.value === 'replace') &&
+    activeTransition.value !== 'none'
 );
 
 /**

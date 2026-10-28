@@ -32,6 +32,7 @@ export type {
   MicroRouterStore,
   NavigationAfterHook,
   NavigationGuard,
+  NavigationKind,
   PageTrackerHooks,
   SerializedState,
   TransitionType
@@ -46,6 +47,8 @@ export type {
   ExtractDialogPaths,
   ExtractControlNames,
   PluginTypedPush,
+  PluginTypedReplace,
+  TypedReplace,
   PluginTypedOpenDialog,
   PluginTypedCloseDialog,
   PluginTypedToggleControl,

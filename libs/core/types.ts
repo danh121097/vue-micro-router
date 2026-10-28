@@ -29,6 +29,9 @@ export type NavigationAfterHook = (to: string, from: string) => void;
 
 export type TransitionType = 'fade' | 'slide' | 'scale';
 
+/** Kind of a page navigation — `'replace'` swaps the top page and still slides forward */
+export type NavigationKind = 'push' | 'back' | 'replace';
+
 export type DialogPosition = 'standard' | 'top' | 'right' | 'bottom' | 'left';
 
 // ── Route ─────────────────────────────────────────────────────────────────────
@@ -233,8 +236,13 @@ export interface MicroRouterStore {
   activePage: ComputedRef<string>;
   fromPage: ComputedRef<string>;
   toPage: ComputedRef<string>;
-  /** True while a navigation animation (push/stepWisePush/stepWiseBack) is in progress */
+  /** True while a navigation animation (push/replace/stepWisePush/stepWiseBack) is in progress */
   isNavigating: ComputedRef<boolean>;
+  /**
+   * Kind of the last navigation: `'push'` (forward), `'back'`, or `'replace'`.
+   * `MicroRouterView` reads it to pick the slide direction.
+   */
+  navigationKind: ComputedRef<NavigationKind>;
   resolveRoutes: ComputedRef<MicroRoute[]>;
   /**
    * Navigate to a destination. Guarded against rapid double-clicks.
@@ -243,6 +251,18 @@ export interface MicroRouterStore {
    */
   push: (
     destination: string | number,
+    props?: Record<string, unknown>
+  ) => Promise<void>;
+  /**
+   * Swap the top page for another route and animate forward: the new page
+   * slides in over the old one, which stays put. Back from the new page returns
+   * to the page under it. With history enabled the current entry is replaced.
+   * Same lock, guards and afterEach as push.
+   * @param segment - Route segment name that takes the top page's place ("result")
+   * @param props - Optional attrs to pass to the new page via useMicroState
+   */
+  replace: (
+    segment: string,
     props?: Record<string, unknown>
   ) => Promise<void>;
   /** Navigate through intermediate pages one-by-one with stepDelay between each */

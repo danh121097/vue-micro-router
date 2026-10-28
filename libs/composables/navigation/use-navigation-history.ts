@@ -5,6 +5,7 @@
  * back()/forward()/go(delta) navigate by re-pushing stored entries via the provided push function.
  *
  * Browser-like behavior: back() + push(new) truncates forward entries.
+ * A replace overwrites the entry at the cursor instead of appending one.
  */
 import { computed, ref, type ComputedRef } from 'vue';
 
@@ -33,6 +34,11 @@ export interface NavigationHistory {
   clear: () => void;
   /** Record a navigation event — called internally after successful push */
   record: (path: string, props?: Record<string, unknown>) => void;
+  /**
+   * Overwrite the current entry — called internally after a successful replace.
+   * Forward entries are truncated: they were reached from the page just replaced.
+   */
+  replaceCurrent: (path: string, props?: Record<string, unknown>) => void;
 }
 
 /**
@@ -69,6 +75,21 @@ export function createNavigationHistory(
       cursor--;
     }
 
+    version.value++;
+  }
+
+  function replaceCurrent(path: string, props?: Record<string, unknown>) {
+    if (!config.enabled || isHistoryNavigation) return;
+    if (cursor < 0) {
+      record(path, props);
+      return;
+    }
+
+    historyEntries.splice(cursor, historyEntries.length - cursor, {
+      path,
+      timestamp: Date.now(),
+      props: props ? { ...props } : undefined
+    });
     version.value++;
   }
 
@@ -123,5 +144,5 @@ export function createNavigationHistory(
     version.value++;
   }
 
-  return { entries, canGoBack, canGoForward, back, forward, go, clear, record };
+  return { entries, canGoBack, canGoForward, back, forward, go, clear, record, replaceCurrent };
 }

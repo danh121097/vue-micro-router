@@ -22,7 +22,7 @@ import {
 } from 'vue';
 
 import { STEP_DELAY } from '../../core/constants';
-import type { MicroRoute, PageTrackerHooks } from '../../core/types';
+import type { MicroRoute, NavigationKind, PageTrackerHooks } from '../../core/types';
 import {
   buildPathFromSegments,
   getLastSegment,
@@ -50,11 +50,17 @@ export interface NavigationState {
   activePage: ComputedRef<string>;
   fromPage: ComputedRef<string>;
   toPage: ComputedRef<string>;
-  /** True while a navigation animation (push/stepWisePush/stepWiseBack) is in progress */
+  /** True while a navigation animation (push/replace/stepWisePush/stepWiseBack) is in progress */
   isNavigating: ComputedRef<boolean>;
+  /** Kind of the last navigation — picks the page transition direction */
+  navigationKind: ComputedRef<NavigationKind>;
   resolveRoutes: ComputedRef<MicroRoute[]>;
   push: (
     destination: string | number,
+    props?: Record<string, unknown>
+  ) => Promise<void>;
+  replace: (
+    segment: string,
     props?: Record<string, unknown>
   ) => Promise<void>;
   stepWisePush: (
@@ -93,6 +99,11 @@ export function useNavigation(
     activePath: defaultPath,
     fromPath: defaultPath,
     toPath: defaultPath,
+    /**
+     * Set in the same tick as activePath, so the render that adds/removes pages
+     * already sees it. Never reset on a timer — the next navigation overwrites it.
+     */
+    navigationKind: 'push' as NavigationKind,
     /** Attrs stored separately — changes here do NOT invalidate resolveRoutes computed */
     routeAttrs: shallowReactive(new Map<string, Record<string, unknown>>()),
     /** Version stamp per segment — incremented on re-navigation to same segment (forces transition) */
@@ -166,13 +177,18 @@ export function useNavigation(
 
     const prevPath = state.activePath;
     tracker?.trackPageLeave?.(prevPath, prevPath, targetPath);
+    state.navigationKind = 'back';
     state.fromPath = prevPath;
     state.toPath = targetPath;
     state.activePath = targetPath;
     tracker?.trackPageEnter?.(targetPath, prevPath, targetPath);
   }
 
-  async function navigateToPath(path: string, props?: Record<string, unknown>) {
+  async function navigateToPath(
+    path: string,
+    props?: Record<string, unknown>,
+    kind: NavigationKind = 'push'
+  ) {
     const normalized = normalizePath(path);
 
     // Warm module cache for async loaders before transitioning
@@ -188,6 +204,7 @@ export function useNavigation(
     if (prevPath !== normalized) {
       tracker?.trackPageLeave?.(prevPath, prevPath, normalized);
     }
+    state.navigationKind = kind;
     state.fromPath = prevPath;
     state.toPath = normalized;
     state.activePath = normalized;
@@ -282,6 +299,7 @@ export function useNavigation(
           for (let i = segments.length + 1; i < currentSegments.length; i++) {
             state.routeAttrs.delete(currentSegments[i]!);
           }
+          state.navigationKind = 'back';
           state.activePath = intermediatePath;
           await nextTick(); // let Vue remove intermediate pages from DOM
           navigateBack(1, props);
@@ -319,6 +337,7 @@ export function useNavigation(
         for (let i = existingIndex + 2; i < currentSegments.length; i++) {
           state.routeAttrs.delete(currentSegments[i]!);
         }
+        state.navigationKind = 'back';
         state.activePath = intermediatePath;
         await nextTick(); // let Vue remove intermediate pages from DOM
         navigateBack(1, props);
@@ -362,28 +381,23 @@ export function useNavigation(
 
   const guardContext = { getRoute: (segment: string) => registry.routes.get(segment) };
 
-  /** Public push — runs navigation guards, then executes pushCore */
-  async function push(
-    destination: string | number,
-    props?: Record<string, unknown>
+  /**
+   * Shared navigation pipeline for push and replace: lock, guards, commit,
+   * history, afterEach, adjacent preload, unlock.
+   * `commit` performs the state change; `recordHistory` writes the history entry.
+   */
+  async function runNavigation(
+    targetPath: string | undefined,
+    commit: () => Promise<void>,
+    recordHistory: (toPath: string) => void
   ) {
-    if (isNavigating.value) return;
-
-    // No-op when the destination resolves to the page we're already on.
-    // e.g. already at /A and pushing to A again → do nothing.
-    if (destination || destination === 0) {
-      const resolved = normalizePath(resolveDestinationPath(destination));
-      if (resolved === normalizePath(state.activePath)) return;
-    }
-
     isNavigating.value = true;
     try {
       // Run guard pipeline before any state mutation
       const hasGlobalGuards = (guardConfig.beforeEach?.length ?? 0) > 0;
       // Per-route guards are checked inside executeGuardPipeline — only enter pipeline if there's reason to
       const hasPerRouteGuards = registry.routes.size > 0;
-      if ((hasGlobalGuards || hasPerRouteGuards) && destination) {
-        const targetPath = resolveDestinationPath(destination);
+      if ((hasGlobalGuards || hasPerRouteGuards) && targetPath !== undefined) {
         const fromPath = normalizePath(state.activePath);
         const allowed = await executeGuardPipeline(targetPath, fromPath, guardConfig, guardContext);
         if (!allowed) {
@@ -393,11 +407,10 @@ export function useNavigation(
       }
 
       const fromPath = normalizePath(state.activePath);
-      await pushCore(destination, props);
+      await commit();
       const toPath = normalizePath(state.activePath);
 
-      // Record history entry after successful navigation
-      navHistory?.record(toPath, props);
+      recordHistory(toPath);
 
       // Fire afterEach hooks (non-blocking)
       executeAfterHooks(toPath, fromPath, guardConfig.afterEach);
@@ -412,6 +425,66 @@ export function useNavigation(
       isNavigating.value = false;
       throw e;
     }
+  }
+
+  /** Public push — runs navigation guards, then executes pushCore */
+  async function push(
+    destination: string | number,
+    props?: Record<string, unknown>
+  ) {
+    if (isNavigating.value) return;
+
+    // No-op when the destination resolves to the page we're already on.
+    // e.g. already at /A and pushing to A again → do nothing.
+    if (destination || destination === 0) {
+      const resolved = normalizePath(resolveDestinationPath(destination));
+      if (resolved === normalizePath(state.activePath)) return;
+    }
+
+    await runNavigation(
+      destination ? resolveDestinationPath(destination) : undefined,
+      () => pushCore(destination, props),
+      // Record history entry after successful navigation
+      (toPath) => navHistory?.record(toPath, props)
+    );
+  }
+
+  /**
+   * Public replace — swap the top segment for `segment` and animate forward.
+   *
+   * `/home/a` → replace('b') → `/home/b`; back from `b` returns to `home`.
+   * The replaced segment's attrs are cleared (as back does for removed pages),
+   * and with history enabled the current entry is overwritten, not appended.
+   *
+   * No-op when `segment` is already the top page (as push), or when it already
+   * sits lower in the stack — a path cannot hold one segment twice, because
+   * attrs and transition keys are stored per segment.
+   */
+  async function replace(segment: string, props?: Record<string, unknown>) {
+    if (isNavigating.value || !segment) return;
+
+    const currentSegments = parsePathSegments(state.activePath);
+    const replaced = currentSegments.at(-1);
+    if (segment === replaced) return;
+    if (currentSegments.includes(segment)) {
+      console.warn(
+        `[vue-micro-router] replace('${segment}') ignored — '${segment}' is already in the stack (${state.activePath}).`
+      );
+      return;
+    }
+
+    const targetPath = buildPathFromSegments([...currentSegments.slice(0, -1), segment]);
+    await runNavigation(
+      targetPath,
+      async () => {
+        await navigateToPath(targetPath, props, 'replace');
+        // Only once the path no longer holds it: navigateToPath awaits the
+        // loaders first, and a render in that gap would show the replaced page
+        // — still on screen under the new one — with its attrs gone.
+        if (replaced) state.routeAttrs.delete(replaced);
+      },
+      (toPath) => navHistory?.replaceCurrent(toPath, props)
+    );
   }
 
   // ── Step-wise navigation (delegated) ──────────────────────────────────────
@@ -460,8 +533,10 @@ export function useNavigation(
     fromPage: computed(() => getLastSegment(state.fromPath)),
     toPage: computed(() => getLastSegment(state.toPath)),
     isNavigating: computed(() => isNavigating.value),
+    navigationKind: computed(() => state.navigationKind),
     resolveRoutes,
     push,
+    replace,
     stepWisePush: stepWise.stepWisePush,
     stepWiseBack: stepWise.stepWiseBack,
     registerRoute: registry.registerRoute,

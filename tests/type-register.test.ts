@@ -11,6 +11,8 @@ import type {
   ExtractDialogPaths,
   ExtractControlNames,
   PluginTypedStepWisePush,
+  PluginTypedReplace,
+  TypedReplace,
 } from '../libs/core/type-helpers';
 
 /* ── Helpers ── */
@@ -86,6 +88,40 @@ describe('Register type helpers', () => {
     void stepWisePush('x');
     // @ts-expect-error 'a/x' contains an unknown segment
     void stepWisePush('a/x');
+
+    expect(true).toBe(true);
+  });
+
+  test('PluginTypedReplace takes known segments and their typed props only', () => {
+    const replace = (() => Promise.resolve()) as PluginTypedReplace<
+      'a' | 'b',
+      { b: { id: number } }
+    >;
+
+    void replace('a');
+    void replace('b', { id: 1 });
+    // @ts-expect-error 'b' requires its props
+    void replace('b');
+    // @ts-expect-error 'x' is not a known route
+    void replace('x');
+    // @ts-expect-error replace has no back step
+    void replace(-1);
+    // @ts-expect-error replace takes a segment, not an absolute path
+    void replace('/a/b');
+
+    expect(true).toBe(true);
+  });
+
+  test('TypedReplace follows the manual RouteMap', () => {
+    const replace = (() => Promise.resolve()) as TypedReplace<{
+      home: undefined;
+      profile: { userId: number };
+    }>;
+
+    void replace('home');
+    void replace('profile', { userId: 1 });
+    // @ts-expect-error 'profile' requires its props
+    void replace('profile');
 
     expect(true).toBe(true);
   });

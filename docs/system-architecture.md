@@ -35,7 +35,7 @@ Push replaces entire stack. Back pops segments. Step-wise navigation adds one pe
 
 | Concept | Stack | Lifecycle | Persist on Page Change |
 |---------|-------|-----------|------------------------|
-| **Pages** | Segment-based | Push/pop/stepWise | Part of history |
+| **Pages** | Segment-based | Push/pop/replace/stepWise | Part of history |
 | **Dialogs** | Own stack | Open/close | Only if persistent |
 | **Controls** | Singleton per name | Toggle on/off | Always |
 
@@ -43,6 +43,7 @@ Push replaces entire stack. Back pops segments. Step-wise navigation adds one pe
 // Pages: replace entire stack
 router.push("home/menu");
 router.stepWisePush("home/menu/settings");
+router.replace("settings_v2"); // swap the top page, slide forward
 router.back(2);
 
 // Dialogs: independent stack

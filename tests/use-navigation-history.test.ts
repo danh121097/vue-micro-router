@@ -125,6 +125,44 @@ describe('Navigation History', () => {
     expect(nav.history!.canGoBack.value).toBe(false);
   });
 
+  test('replace overwrites the current entry instead of adding one', async () => {
+    const nav = createNav({ history: { enabled: true } });
+    for (const path of ['home', 'welcome', 'quiz']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+
+    await nav.push('welcome');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.replace('quiz', { questionId: 1 });
+
+    const entries = nav.history!.entries.value;
+    expect(entries.map((e) => e.path)).toEqual(['/home', '/home/quiz']);
+    expect(entries.at(-1)!.props).toEqual({ questionId: 1 });
+
+    // History back from the replaced page lands on the page under it.
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.history!.back();
+    expect(nav.activePage.value).toBe('home');
+  });
+
+  test('replace after back() truncates forward entries', async () => {
+    const nav = createNav({ history: { enabled: true } });
+    for (const path of ['home', 'a', 'b', 'c']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+
+    await nav.push('a');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.push('b');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.history!.back();
+    await new Promise((r) => setTimeout(r, 20));
+
+    await nav.replace('c');
+    expect(nav.history!.entries.value.map((e) => e.path)).toEqual(['/home', '/home/c']);
+    expect(nav.history!.canGoForward.value).toBe(false);
+  });
+
   test('zero overhead when history disabled (default)', () => {
     const nav = createNav();
     expect(nav.history).toBeUndefined();

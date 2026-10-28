@@ -339,6 +339,97 @@ describe('useNavigation', () => {
     expect(stored).toEqual({ fromStore: true, fromPage: 1 });
   });
 
+  test('replace swaps the top segment and records the kind', async () => {
+    const nav = createNav({ stepDelay: 10 });
+    for (const path of ['home', 'welcome', 'quiz']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+    await nav.push('welcome');
+    expect(nav.navigationKind.value).toBe('push');
+    await new Promise((r) => setTimeout(r, 20));
+
+    await nav.replace('quiz');
+    expect(nav.activePath.value).toBe('/home/quiz');
+    expect(nav.navigationKind.value).toBe('replace');
+  });
+
+  test('back after a replace returns to the page under it', async () => {
+    const nav = createNav({ stepDelay: 10 });
+    for (const path of ['home', 'welcome', 'quiz']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+    await nav.push('welcome');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.replace('quiz');
+    await new Promise((r) => setTimeout(r, 20));
+
+    await nav.push(-1);
+    expect(nav.activePage.value).toBe('home');
+    expect(nav.navigationKind.value).toBe('back');
+  });
+
+  test('replace passes props to the new page and clears the replaced page attrs', async () => {
+    const nav = createNav({ stepDelay: 10 });
+    for (const path of ['home', 'welcome', 'quiz']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+    await nav.push('welcome', { step: 1 });
+    await new Promise((r) => setTimeout(r, 20));
+
+    await nav.replace('quiz', { questionId: 7 });
+    expect(nav.getRouteAttrs('quiz')).toEqual({ questionId: 7 });
+    // A later visit to `welcome` must not bring its old attrs back.
+    expect(nav.getRouteAttrs('welcome')).toBeUndefined();
+  });
+
+  test('replace at the root swaps the only page', async () => {
+    const nav = createNav({ stepDelay: 10 });
+    nav.registerRoute({ path: 'home', component: { render: () => null } } as any);
+    nav.registerRoute({ path: 'intro', component: { render: () => null } } as any);
+
+    await nav.replace('intro');
+    expect(nav.activePath.value).toBe('/intro');
+  });
+
+  test('replace is a no-op for the top page and for a segment already in the stack', async () => {
+    const nav = createNav({ stepDelay: 10 });
+    for (const path of ['home', 'a', 'b']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+    await nav.push('a');
+    await new Promise((r) => setTimeout(r, 20));
+    await nav.push('b');
+    await new Promise((r) => setTimeout(r, 20));
+
+    await nav.replace('b');
+    expect(nav.activePath.value).toBe('/home/a/b');
+    expect(nav.isNavigating.value).toBe(false);
+
+    const warn = mock(() => {});
+    const original = console.warn;
+    console.warn = warn;
+    try {
+      // `/home/a/a` would hold one segment twice — attrs and keys are per segment.
+      await nav.replace('a');
+    } finally {
+      console.warn = original;
+    }
+    expect(nav.activePath.value).toBe('/home/a/b');
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  test('replace respects the navigation lock', async () => {
+    const nav = createNav({ stepDelay: 50 });
+    for (const path of ['home', 'a', 'b']) {
+      nav.registerRoute({ path, component: { render: () => null } } as any);
+    }
+    await nav.push('a');
+    expect(nav.isNavigating.value).toBe(true);
+
+    await nav.replace('b');
+    expect(nav.activePath.value).toBe('/home/a');
+  });
+
   test('async component loader is detected and wrapped', () => {
     const nav = createNav();
     const asyncLoader = () => import('../libs/core/types');

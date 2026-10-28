@@ -6,6 +6,8 @@
 | `NavigationAfterHook` | `(to, from) => void` |
 | `RouteMap` | `Record<string, Record<string, unknown> \| undefined>` |
 | `TypedPush<T>` | Type-safe push overloads for a RouteMap |
+| `TypedReplace<T>` | Type-safe replace overloads for a RouteMap (segment names only) |
+| `NavigationKind` | `'push' \| 'back' \| 'replace'` — kind of the last navigation |
 | `SerializedState` | JSON-serializable router state snapshot |
 | `AudioAdapter` | Abstract audio playback interface |
 | `GestureConfig` | Gesture navigation configuration |
