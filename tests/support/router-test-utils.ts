@@ -27,7 +27,8 @@ import type {
   MicroControl,
   MicroDialog,
   MicroRoute,
-  MicroRouterStore
+  MicroRouterStore,
+  PageTrackerHooks
 } from '../../libs/core/types';
 
 /** Minimal page component that renders its own label — enough to assert on markup. */
@@ -54,6 +55,8 @@ export interface MountRouterOptions {
   devtools?: boolean;
   /** Swipe-back gesture config; omit to leave the feature off. */
   gesture?: GestureConfig;
+  /** Analytics hooks; omit to leave the tracker absent. */
+  tracker?: PageTrackerHooks;
   /** Global mixins — pass `createUpdateCounter().mixin` to tally re-renders. */
   mixins?: ComponentOptions[];
 }
@@ -109,6 +112,7 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
     stepDelay,
     devtools,
     gesture,
+    tracker,
     mixins = []
   } = options;
 
@@ -130,7 +134,8 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
         defaultControlName,
         ...(stepDelay ? { stepDelay } : {}),
         ...(devtools === undefined ? {} : { devtools }),
-        ...(gesture === undefined ? {} : { gesture })
+        ...(gesture === undefined ? {} : { gesture }),
+        ...(tracker === undefined ? {} : { tracker })
       },
       plugins: [plugin],
       nested

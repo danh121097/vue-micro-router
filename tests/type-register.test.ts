@@ -12,6 +12,7 @@ import type {
   ExtractControlNames,
   PluginTypedStepWisePush,
   PluginTypedReplace,
+  PluginTypedCloseDialog,
   TypedReplace,
 } from '../libs/core/type-helpers';
 
@@ -123,6 +124,17 @@ describe('Register type helpers', () => {
     // @ts-expect-error 'profile' requires its props
     void replace('profile');
 
+    expect(true).toBe(true);
+  });
+
+  test('PluginTypedCloseDialog takes an optional close reason', () => {
+    const close = (() => {}) as PluginTypedCloseDialog<'confirm'>;
+    close('confirm');
+    close('confirm', 'close_button');
+    // @ts-expect-error — not a close reason
+    close('confirm', 'swipe');
+    // @ts-expect-error — not a registered dialog
+    close('other');
     expect(true).toBe(true);
   });
 });

@@ -9,10 +9,11 @@
  * mounted page. Each assertion says which reading it is.
  */
 /* eslint-disable vue/one-component-per-file -- probe components are test fixtures, not app components */
-import { afterEach, describe, expect, test } from 'bun:test';
-import { defineComponent, h, markRaw } from 'vue';
+import { afterEach, describe, expect, spyOn, test } from 'bun:test';
+import { defineComponent, h, markRaw, ref } from 'vue';
 
 import { useMicroState } from '../libs/composables/use-micro-state';
+import type { TrackerEvent } from '../libs/core/types';
 import {
   cleanupRouters,
   createPage,
@@ -218,6 +219,116 @@ describe('MicroRouterView — rendering', () => {
     expect(root.wrapper.find('.route-page').attributes('style')).toContain(
       '--mr-page-height: 100dvh'
     );
+  });
+});
+
+describe('MicroRouterView — tracking surface', () => {
+  test('pages and controls carry their owner as data attributes', async () => {
+    const r = mountRouter({
+      routes: homeAndDetail,
+      stepDelay: STEP_DELAY,
+      controls: [{ name: 'main_gui', component: createPage('hud'), activated: false }]
+    });
+    await flush(4);
+    await r.store.push('detail');
+    await flush();
+
+    const owners = r.wrapper.findAll('[data-micro-page]').map((w) => w.attributes('data-micro-page'));
+    expect(owners).toEqual(['home', 'detail']);
+    expect(r.wrapper.find('.page--detail').element.closest('[data-micro-page]')?.getAttribute('data-micro-page')).toBe('detail');
+    expect(r.wrapper.find('.page--hud').attributes('data-micro-control')).toBe('main_gui');
+  });
+
+  test('a control whose root is not one element gets no owner attribute and no warning', async () => {
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    const FragmentHud = markRaw(
+      defineComponent({
+        name: 'FragmentHud',
+        setup: () => () => [h('div', { class: 'hud-a' }), h('div', { class: 'hud-b' })]
+      })
+    );
+    const r = mountRouter({
+      routes: homeAndDetail,
+      controls: [{ name: 'main_gui', component: FragmentHud, activated: false }]
+    });
+    await flush(4);
+
+    expect(r.wrapper.find('.hud-a').exists()).toBe(true);
+    expect(document.querySelector('[data-micro-control]')).toBeNull();
+    // Only warnings about this control: another file's late warning can land in the spy.
+    const extraneous = warn.mock.calls
+      // Strings only: Vue's trace also passes props proxies, which do not stringify
+      .map((args) => args.filter((a) => typeof a === 'string').join(' '))
+      .filter((text) => text.includes('Extraneous non-props attributes') && text.includes('FragmentHud'));
+    warn.mockRestore();
+    expect(extraneous).toEqual([]);
+  });
+
+  test('a control that renders its root later still gets the owner attribute', async () => {
+    const shown = ref(false);
+    const LateHud = markRaw(
+      defineComponent({
+        name: 'LateHud',
+        setup: () => () => (shown.value ? h('div', { class: 'late-hud' }) : null)
+      })
+    );
+    const r = mountRouter({
+      routes: homeAndDetail,
+      controls: [{ name: 'main_gui', component: LateHud, activated: false }]
+    });
+    await flush(4);
+    shown.value = true;
+    await flush(2);
+
+    expect(r.wrapper.find('.late-hud').attributes('data-micro-control')).toBe('main_gui');
+  });
+
+  test('tagging a control does not need a global Node (non-browser test runners)', async () => {
+    const saved = Object.getOwnPropertyDescriptor(globalThis, 'Node')!;
+    Reflect.deleteProperty(globalThis, 'Node');
+    try {
+      const r = mountRouter({
+        routes: homeAndDetail,
+        controls: [{ name: 'main_gui', component: createPage('hud'), activated: false }]
+      });
+      await flush(4);
+      expect(r.wrapper.find('.page--hud').attributes('data-micro-control')).toBe('main_gui');
+    } finally {
+      Object.defineProperty(globalThis, 'Node', saved);
+    }
+  });
+
+  test('mount reports the first page and the default control on onEvent', async () => {
+    const events: TrackerEvent[] = [];
+    mountRouter({
+      routes: homeAndDetail,
+      controls: [{ name: 'main_gui', component: createPage('hud'), activated: false }],
+      tracker: { onEvent: (e) => events.push(e) }
+    });
+    await flush(4);
+
+    expect(events.map((e) => [e.kind, e.phase, e.name])).toEqual([
+      ['control', 'enter', 'main_gui'],
+      ['page', 'enter', 'home']
+    ]);
+  });
+
+  test('getRegistry lists every registered definition with its meta', async () => {
+    const r = mountRouter({
+      routes: [
+        { path: 'home', component: createPage('home'), meta: { screen: 'map' } },
+        { path: 'detail', component: createPage('detail') }
+      ],
+      dialogs: [{ path: 'confirm', component: createPage('confirm'), activated: false, meta: { track: false } }],
+      controls: [{ name: 'main_gui', component: createPage('hud'), activated: false }]
+    });
+    await flush();
+
+    expect(r.store.getRegistry()).toEqual({
+      routes: [{ path: 'home', meta: { screen: 'map' } }, { path: 'detail' }],
+      dialogs: [{ path: 'confirm', meta: { track: false } }],
+      controls: [{ name: 'main_gui' }]
+    });
   });
 });
 

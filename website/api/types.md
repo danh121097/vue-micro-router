@@ -9,6 +9,10 @@
 | `TypedReplace<T>` | Type-safe replace overloads for a RouteMap (segment names only) |
 | `NavigationKind` | `'push' \| 'back' \| 'replace'` — kind of the last navigation |
 | `SerializedState` | JSON-serializable router state snapshot |
+| `TrackerEvent` | One page/dialog/control change delivered to `tracker.onEvent` |
+| `CloseReason` | `'close_button' \| 'backdrop' \| 'escape' \| 'gesture' \| 'programmatic' \| 'replace'` |
+| `MicroMeta` | `Record<string, unknown>` — free-form `meta` on a route, dialog or control |
+| `MicroRouterRegistry` | `getRegistry()` result: registered routes, dialogs and controls with their `meta` |
 | `AudioAdapter` | Abstract audio playback interface |
 | `GestureConfig` | Gesture navigation configuration |
 

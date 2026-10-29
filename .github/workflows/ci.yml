@@ -65,11 +65,14 @@ jobs:
           # figures live in plans/.../plan.md. The two checks above are the
           # precise ones; this is the blunt "no net regression" backstop.
           # Raised from 12644 to 12979 for the replace navigation (+335 B):
-          # new API, not a regression. Raise it only for a feature, never to
-          # absorb growth nobody can name.
+          # new API, not a regression. Raised to 14442 for the tracking hooks
+          # (tracker.onEvent, close reasons, meta, owner attributes,
+          # getRegistry): +1463 B over the base, measured locally (13001 →
+          # 14464) and added to the base CI measured (12979). Raise it only
+          # for a feature, never to absorb growth nobody can name.
           size=$(gzip -c dist/index.mjs | wc -c)
-          echo "dist/index.mjs: ${size} B gzip (baseline ceiling 12979)"
-          test "$size" -le 12979 || exit 1
+          echo "dist/index.mjs: ${size} B gzip (baseline ceiling 14442)"
+          test "$size" -le 14442 || exit 1
 
   # Build the VitePress docs and deploy to Cloudflare Pages.
   deploy-docs:

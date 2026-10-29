@@ -34,6 +34,14 @@ export type NavigationKind = 'push' | 'back' | 'replace';
 
 export type DialogPosition = 'standard' | 'top' | 'right' | 'bottom' | 'left';
 
+/**
+ * Free-form data attached to a route, dialog or control definition. The router
+ * never reads it: it is handed back on every {@link TrackerEvent} and by
+ * `getRegistry()`, so analytics names, opt-outs or owners live next to the
+ * definition they describe.
+ */
+export type MicroMeta = Record<string, unknown>;
+
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 export interface MicroRoute {
@@ -55,6 +63,8 @@ export interface MicroRoute {
   beforeEnter?: NavigationGuard;
   /** Guard called before navigating AWAY from this route. Return false to cancel. */
   beforeLeave?: NavigationGuard;
+  /** Free-form data — passed to `tracker.onEvent` and `getRegistry()`, never read by the router */
+  meta?: MicroMeta;
   /** Internal: cache key for transition identity */
   key?: string;
   /** Internal: incremented to force full component remount */
@@ -88,6 +98,8 @@ export interface MicroDialog {
   seamless?: boolean;
   /** Prime mobile keyboard on open — set true for dialogs with autofocus inputs */
   focusInput?: boolean;
+  /** Free-form data — passed to `tracker.onEvent` and `getRegistry()`, never read by the router */
+  meta?: MicroMeta;
   /** Internal: incremented on each open to force component remount */
   componentKey?: number;
 }
@@ -114,13 +126,84 @@ export interface MicroControl {
   component: AsyncComponentLoader | Component;
   /** Props passed to the component */
   attrs?: Record<string, unknown>;
+  /** Free-form data — passed to `tracker.onEvent` and `getRegistry()`, never read by the router */
+  meta?: MicroMeta;
   /** Internal: incremented on each activation to force component remount */
   componentKey?: number;
 }
 
 // ── Page Tracker ──────────────────────────────────────────────────────────────
 
+/** What a {@link TrackerEvent} is about */
+export type TrackerEventKind = 'page' | 'dialog' | 'control';
+
+/**
+ * - `enter` / `leave` — the page, dialog or control was mounted into / removed
+ *   from its stack (for a control: activated / deactivated).
+ * - `cover` / `uncover` — it stays mounted but another one of the same kind
+ *   went on top of it / the one on top of it went away. Pages cover pages and
+ *   dialogs cover dialogs; nothing covers across kinds, and controls never
+ *   cover.
+ */
+export type TrackerEventPhase = 'enter' | 'leave' | 'cover' | 'uncover';
+
+/**
+ * Why a page, dialog or control left (only on `leave` events).
+ *
+ * - `escape` / `backdrop` — the dialog closed itself on Escape or a backdrop
+ *   click (never for a `persistent` dialog).
+ * - `close_button` — the caller said so: `closeDialog(path, 'close_button')`.
+ * - `gesture` — the page left on the swipe-back gesture.
+ * - `replace` — `replace()` swapped the page out, or another control took
+ *   this control's place.
+ * - `programmatic` — anything else: `push`, `closeDialog(path)`,
+ *   `closeAllDialogs()`, the dialog's injected `onClose`, `toggleControl(name, false)`.
+ */
+export type CloseReason =
+  | 'close_button'
+  | 'backdrop'
+  | 'escape'
+  | 'gesture'
+  | 'programmatic'
+  | 'replace';
+
+/**
+ * One change to the page stack, the dialog stack or the active controls,
+ * delivered to `tracker.onEvent`. Within one change, leaves come first; a page
+ * is covered only after its own enter.
+ */
+export interface TrackerEvent {
+  kind: TrackerEventKind;
+  phase: TrackerEventPhase;
+  /** Route segment, dialog path or control name */
+  name: string;
+  /**
+   * Pages: the full path of this page in the stack (`/home/menu` for `menu`).
+   * Dialogs and controls: same as `name`.
+   */
+  path: string;
+  /**
+   * State before → after the change. Pages: the active path. Dialogs: the
+   * top dialog (`''` when none). Controls: `currentControl` (`''` when none
+   * is active).
+   */
+  from: string;
+  to: string;
+  /** Page events only: the kind of navigation that caused it */
+  navigationKind?: NavigationKind;
+  /** `leave` events only */
+  closeReason?: CloseReason;
+  /** The definition's `meta`, when it has one */
+  meta?: MicroMeta;
+}
+
 export interface PageTrackerHooks {
+  /**
+   * Every page, dialog and control change, with the close reason and the
+   * definition's `meta`. Additive: the `track*` hooks below still fire. A throw
+   * is caught and logged, never breaking navigation.
+   */
+  onEvent?: (event: TrackerEvent) => void;
   trackPageEnter?: (page: string, from?: string, to?: string) => void;
   trackPageLeave?: (page: string, from?: string, to?: string) => void;
   trackDialogEnter?: (dialog: string, from?: string, to?: string) => void;
@@ -196,6 +279,18 @@ export interface SerializedState {
     active: string[];
     attrs: Record<string, Record<string, unknown>>;
   };
+}
+
+// ── Registry ─────────────────────────────────────────────────────────────────
+
+/**
+ * Plain snapshot of what is registered on a router, from `getRegistry()`.
+ * In registration order; components and runtime state are left out.
+ */
+export interface MicroRouterRegistry {
+  routes: Array<{ path: string; meta?: MicroMeta }>;
+  dialogs: Array<{ path: string; meta?: MicroMeta }>;
+  controls: Array<{ name: string; meta?: MicroMeta }>;
 }
 
 // ── Feature Plugin ────────────────────────────────────────────────────────────
@@ -299,8 +394,12 @@ export interface MicroRouterStore {
   resolveDialogs: ComputedRef<MicroDialog[]>;
   /** Open a dialog by path. Returns a DialogInstance handle. Props available via useMicroState inside the dialog. */
   openDialog: (path: string, props?: Record<string, unknown>) => DialogInstance;
-  /** Close a specific dialog by path. Triggers exit animation. */
-  closeDialog: (path: string) => void;
+  /**
+   * Close a specific dialog by path. Triggers exit animation.
+   * @param reason - Reported as `closeReason` on `tracker.onEvent`. Default `'programmatic'`;
+   *   pass `'close_button'` from a dialog's own close button.
+   */
+  closeDialog: (path: string, reason?: CloseReason) => void;
   /** Close all open dialogs at once. Invokes onClose callbacks after DOM updates. */
   closeAllDialogs: () => void;
   registerDialog: (dialog: MicroDialog) => void;
@@ -327,6 +426,10 @@ export interface MicroRouterStore {
   registerControls: (controls: MicroControl[]) => void;
   getControlAttrs: (name: string) => Record<string, unknown> | undefined;
   updateControlAttrs: (name: string, attrs: Record<string, unknown>) => void;
+
+  // ── Registry ─────────────────────────────────────────────────────────────
+  /** Snapshot of the registered routes, dialogs and controls with their `meta` */
+  getRegistry: () => MicroRouterRegistry;
 
   // ── History (only present when config.history.enabled) ────────────────────
   /** Whether there's a previous entry to go back to */

@@ -20,6 +20,7 @@
 
 // ── Types ──
 export type {
+  CloseReason,
   DialogInstance,
   DialogPosition,
   DialogProps,
@@ -27,14 +28,19 @@ export type {
   FeaturePluginConfig,
   MicroControl,
   MicroDialog,
+  MicroMeta,
   MicroRoute,
   MicroRouterConfig,
+  MicroRouterRegistry,
   MicroRouterStore,
   NavigationAfterHook,
   NavigationGuard,
   NavigationKind,
   PageTrackerHooks,
   SerializedState,
+  TrackerEvent,
+  TrackerEventKind,
+  TrackerEventPhase,
   TransitionType
 } from './core/types';
 

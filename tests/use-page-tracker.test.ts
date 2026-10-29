@@ -12,6 +12,7 @@ describe('usePageTracker', () => {
     tracker.trackDialogLeave('dialog');
     tracker.trackGuiEnter('gui');
     tracker.trackGuiLeave('gui');
+    tracker.onEvent({ kind: 'page', phase: 'enter', name: 'home', path: '/home', from: '', to: '/home' });
     tracker.cleanupAllSessions();
   });
 
@@ -25,6 +26,13 @@ describe('usePageTracker', () => {
 
     tracker.trackGuiLeave('main_gui');
     expect(trackGuiLeave).toHaveBeenCalledWith('main_gui');
+  });
+
+  test('passes onEvent through', () => {
+    const onEvent = mock(() => {});
+    const event = { kind: 'page', phase: 'enter', name: 'home', path: '/home', from: '', to: '/home' } as const;
+    usePageTracker({ onEvent }).onEvent(event);
+    expect(onEvent).toHaveBeenCalledWith(event);
   });
 
   test('missing hooks use no-ops', () => {

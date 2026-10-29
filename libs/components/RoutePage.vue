@@ -30,7 +30,7 @@ if (props.routePath) {
 </script>
 
 <template>
-  <div class="route-page">
+  <div class="route-page" :data-micro-page="routePath">
     <div class="route-page__body">
       <slot />
     </div>

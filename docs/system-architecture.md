@@ -195,7 +195,7 @@ dialogAttrs: Map<string, Record> // Per-dialog props
 
 // API
 openDialog(path, props?)    // Push to stack
-closeDialog(path)           // Mark closing, schedule removal
+closeDialog(path, reason?)  // Mark closing, schedule removal; reason → tracker closeReason
 closeAllDialogs()           // Clear entire stack
 registerDialog(dialog)      // Add to catalog
 updateDialogAttrs(path, attrs) // Merge props

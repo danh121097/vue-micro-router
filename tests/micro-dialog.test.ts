@@ -11,6 +11,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 
 import { defineComponent, h, markRaw } from 'vue';
 
+import type { PageTrackerHooks, TrackerEvent } from '../libs/core/types';
 import {
   cleanupRouters,
   createPage,
@@ -70,8 +71,9 @@ function createAutofocusDialog() {
   );
 }
 
-function mountWithDialogs(persistent = false) {
+function mountWithDialogs(persistent = false, tracker?: PageTrackerHooks) {
   return mountRouter({
+    tracker,
     routes: [{ path: 'home', component: createPage('home') }],
     dialogs: [
       {
@@ -191,6 +193,36 @@ describe('MicroDialog — dismissal', () => {
     await flush(6);
 
     expect(r.store.activeDialog.value).toBe('confirm');
+  });
+
+  test('Escape and a backdrop click are reported as the close reason', async () => {
+    const events: TrackerEvent[] = [];
+    const r = mountWithDialogs(false, { onEvent: (e) => events.push(e) });
+    await flush();
+    const leaves = () =>
+      events.filter((e) => e.kind === 'dialog' && e.phase === 'leave').map((e) => e.closeReason);
+
+    r.store.openDialog('confirm');
+    await flush(6);
+    press(dialogEl()!, 'Escape');
+    await flush(6);
+    expect(leaves()).toEqual(['escape']);
+
+    await wait(CLOSE_SETTLE_MS);
+    r.store.openDialog('confirm');
+    await flush(6);
+    click(portalEl()!);
+    await flush(6);
+    expect(leaves()).toEqual(['escape', 'backdrop']);
+  });
+
+  test('the portal carries the dialog path for closest() lookups', async () => {
+    const r = mountWithDialogs();
+    await flush();
+    r.store.openDialog('confirm');
+    await flush(6);
+    const inner = document.querySelector('.page--confirm')!;
+    expect(inner.closest('[data-micro-dialog]')?.getAttribute('data-micro-dialog')).toBe('confirm');
   });
 
   test('a click inside the dialog content does not close it', async () => {

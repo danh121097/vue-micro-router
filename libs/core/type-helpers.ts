@@ -135,7 +135,7 @@ export interface PluginTypedOpenDialog<Dialogs extends string, AttrsMap = {}> {
 }
 
 export interface PluginTypedCloseDialog<Dialogs extends string> {
-  (path: Dialogs): void;
+  (path: Dialogs, reason?: import('./types').CloseReason): void;
 }
 
 export interface PluginTypedToggleControl<Controls extends string, AttrsMap = {}> {

@@ -22,7 +22,13 @@ import {
 } from 'vue';
 
 import { STEP_DELAY } from '../../core/constants';
-import type { MicroRoute, NavigationKind, PageTrackerHooks } from '../../core/types';
+import type {
+  CloseReason,
+  MicroRoute,
+  MicroRouterRegistry,
+  NavigationKind,
+  PageTrackerHooks
+} from '../../core/types';
 import {
   buildPathFromSegments,
   getLastSegment,
@@ -33,6 +39,8 @@ import {
 import { createTimerManager } from '../../utils/timer-manager';
 import { executeAfterHooks, executeGuardPipeline, type GuardConfig } from './use-navigation-guards';
 import { createNavigationHistory, type NavigationHistory, type NavigationHistoryConfig } from './use-navigation-history';
+import { listDefinitions } from '../use-page-tracker';
+import { createPageEvents } from './use-page-events';
 import { createRouteRegistry } from './use-route-registry';
 import { createStepWiseNavigation } from './use-navigation-step-wise';
 
@@ -79,6 +87,12 @@ export interface NavigationState {
   routes: Map<string, MicroRoute>;
   /** Navigation history (only populated when config.history.enabled) */
   history?: NavigationHistory;
+  /** Registered route segments with their `meta`, in registration order */
+  listRoutes: () => MicroRouterRegistry['routes'];
+  /** Report the current page stack to `tracker.onEvent` (the initial enter on mount) */
+  trackCurrentPage: () => void;
+  /** Run a navigation whose page leaves report `reason` to `tracker.onEvent` */
+  withLeaveReason: (reason: CloseReason, run: () => Promise<void>) => Promise<void>;
   cleanup: () => void;
 }
 
@@ -118,6 +132,12 @@ export function useNavigation(
    * Only replaces cached entry when key or componentKey actually changes.
    */
   const resolvedCache = new Map<string, MicroRoute>();
+
+  const pageEvents = createPageEvents({
+    tracker,
+    getMeta: (segment) => registry.routes.get(segment)?.meta,
+    getVersion: (segment) => state.routeKeys.get(segment) || 0
+  });
 
   const resolveRoutes = computed<MicroRoute[]>(() => {
     const activeSegments = parsePathSegments(state.activePath);
@@ -181,6 +201,7 @@ export function useNavigation(
     state.fromPath = prevPath;
     state.toPath = targetPath;
     state.activePath = targetPath;
+    pageEvents.sync(targetPath, 'back');
     tracker?.trackPageEnter?.(targetPath, prevPath, targetPath);
   }
 
@@ -209,6 +230,7 @@ export function useNavigation(
     state.toPath = normalized;
     state.activePath = normalized;
     if (props) updateRouteProps(normalized, props);
+    pageEvents.sync(normalized, kind);
     tracker?.trackPageEnter?.(normalized, prevPath, normalized);
   }
 
@@ -525,6 +547,10 @@ export function useNavigation(
     stepDelay
   });
 
+  function listRoutes(): MicroRouterRegistry['routes'] {
+    return listDefinitions(registry.routes.values(), 'path');
+  }
+
   return {
     activePath: computed(() => state.activePath),
     fromPath: computed(() => state.fromPath),
@@ -547,6 +573,9 @@ export function useNavigation(
     preloadRoute: registry.preloadRoute,
     routes: registry.routes,
     history: navHistory,
+    listRoutes,
+    trackCurrentPage: () => pageEvents.sync(state.activePath, state.navigationKind),
+    withLeaveReason: pageEvents.withLeaveReason,
     cleanup: timers.cleanup
   };
 }

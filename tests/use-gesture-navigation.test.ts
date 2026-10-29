@@ -16,6 +16,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { defineComponent, h, markRaw } from 'vue';
 
 import MicroRouterView from '../libs/components/MicroRouterView.vue';
+import type { PageTrackerHooks, TrackerEvent } from '../libs/core/types';
 import { cleanupRouters, createPage, flush, mountRouter } from './support/router-test-utils';
 
 const STEP_DELAY = 10;
@@ -29,11 +30,15 @@ const routes = [
 afterEach(cleanupRouters);
 
 /** Mount with the gesture on, then push so there is a page to go back from. */
-async function mountWithTwoPages(gesture: Record<string, unknown> = {}) {
+async function mountWithTwoPages(
+  gesture: Record<string, unknown> = {},
+  tracker?: PageTrackerHooks
+) {
   const r = mountRouter({
     routes,
     stepDelay: STEP_DELAY,
-    gesture: { enabled: true, ...gesture }
+    gesture: { enabled: true, ...gesture },
+    tracker
   });
   await flush(3);
   await r.store.push('detail');
@@ -127,6 +132,30 @@ describe('swipe-back gesture', () => {
     await flush(4);
 
     expect(r.store.activePage.value).toBe('home');
+  });
+
+  test('the page a swipe takes away reports closeReason gesture', async () => {
+    const events: TrackerEvent[] = [];
+    const r = await mountWithTwoPages({}, { onEvent: (e) => events.push(e) });
+    const el = container();
+
+    el.dispatchEvent(pointer('pointerdown', 5));
+    el.dispatchEvent(pointer('pointermove', 400));
+    await frame();
+    el.dispatchEvent(pointer('pointerup', 400));
+    await new Promise((resolve) => setTimeout(resolve, 260));
+    await flush(4);
+
+    expect(events.find((e) => e.phase === 'leave' && e.name === 'detail')).toMatchObject({
+      closeReason: 'gesture',
+      navigationKind: 'back'
+    });
+
+    // The next back is not a gesture.
+    await r.store.push('detail');
+    await new Promise((resolve) => setTimeout(resolve, STEP_DELAY + 20));
+    await r.store.push(-1);
+    expect(events.at(-2)).toMatchObject({ phase: 'leave', name: 'detail', closeReason: 'programmatic' });
   });
 
   test('a short fast flick navigates back below the distance threshold', async () => {

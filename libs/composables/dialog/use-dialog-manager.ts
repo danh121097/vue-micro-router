@@ -17,14 +17,18 @@ import {
 } from 'vue';
 
 import type {
+  CloseReason,
   DialogInstance,
   DialogProps,
   MicroDialog,
+  MicroRouterRegistry,
   PageTrackerHooks
 } from '../../core/types';
 import { primeDialogMobileKeyboard } from '../../utils/dialog-focus';
 import { isAsyncLoader, safeMarkRaw } from '../../utils/path-utils';
 import { createTimerManager } from '../../utils/timer-manager';
+import { listDefinitions } from '../use-page-tracker';
+import { createDialogEvents } from './use-dialog-events';
 
 export interface DialogManagerState {
   activeDialog: ComputedRef<string>;
@@ -32,12 +36,14 @@ export interface DialogManagerState {
   toDialog: ComputedRef<string>;
   resolveDialogs: ComputedRef<MicroDialog[]>;
   openDialog: (path: string, props?: Record<string, unknown>) => DialogInstance;
-  closeDialog: (path: string) => void;
+  closeDialog: (path: string, reason?: CloseReason) => void;
   closeAllDialogs: () => void;
   registerDialog: (dialog: MicroDialog) => void;
   registerDialogs: (dialogs: MicroDialog[]) => void;
   getDialogAttrs: (path: string) => Record<string, unknown> | undefined;
   updateDialogAttrs: (path: string, attrs: Record<string, unknown>) => void;
+  /** Registered dialog paths with their `meta`, in registration order */
+  listDialogs: () => MicroRouterRegistry['dialogs'];
   cleanup: () => void;
 }
 
@@ -60,6 +66,8 @@ export function useDialogManager(
     /** Attrs stored separately for useMicroState access inside dialog components */
     dialogAttrs: shallowReactive(new Map<string, Record<string, unknown>>())
   });
+
+  const events = createDialogEvents(state.dialogs, tracker);
 
   const resolveDialogs = computed<MicroDialog[]>(() => {
     const result: MicroDialog[] = [];
@@ -88,11 +96,18 @@ export function useDialogManager(
     return { path, attrs };
   }
 
-  function executeDialog({ path, open, attrs }: DialogProps): DialogInstance {
+  function executeDialog(
+    { path, open, attrs }: DialogProps,
+    closeReason: CloseReason = 'programmatic'
+  ): DialogInstance {
     const dialog = state.dialogs.get(path);
     if (!dialog) return createInstance(path, attrs);
 
     void nextTick(() => {
+      // Read when the change applies, not when it was asked for: an open or
+      // close queued before this one may have moved the stack since.
+      const wasOpen = state.dialogs.get(path)?.activated ?? false;
+      const prevTop = state.activeDialog;
       if (open) {
         state.fromDialog = state.activeDialog;
         state.toDialog = path;
@@ -118,6 +133,9 @@ export function useDialogManager(
             }
           }
         });
+        // A re-open of a dialog already showing remounts it but is no new
+        // screen, so it reports nothing.
+        if (!wasOpen) events.opened(path, prevTop);
       } else {
         state.fromDialog = state.activeDialog;
         const index = state.dialogStack.indexOf(path);
@@ -134,6 +152,8 @@ export function useDialogManager(
           closing: true,
           attrs: undefined
         });
+
+        if (wasOpen) events.closed(path, prevTop, state.activeDialog, closeReason);
 
         safeTimeout(() => {
           const current = state.dialogs.get(path);
@@ -168,15 +188,16 @@ export function useDialogManager(
     }
   }
 
-  function closeDialog(path: string) {
+  function closeDialog(path: string, reason: CloseReason = 'programmatic') {
     tracker?.trackDialogLeave?.(path, path, '');
     state.dialogAttrs.delete(path);
-    executeDialog({ path, open: false });
+    executeDialog({ path, open: false }, reason);
   }
 
   function closeAllDialogs() {
     const closingPaths: string[] = [];
     const callbacks: Array<() => void> = [];
+    events.closedAll(state.dialogStack, state.activeDialog);
     state.dialogs.forEach((dialog, path) => {
       if (dialog.activated) {
         tracker?.trackDialogLeave?.(path, path, '');
@@ -236,6 +257,10 @@ export function useDialogManager(
     state.dialogAttrs.set(path, { ...existing, ...attrs });
   }
 
+  function listDialogs(): MicroRouterRegistry['dialogs'] {
+    return listDefinitions(state.dialogs.values(), 'path');
+  }
+
   return {
     activeDialog: computed(() => state.activeDialog),
     fromDialog: computed(() => state.fromDialog),
@@ -248,6 +273,7 @@ export function useDialogManager(
     registerDialogs,
     getDialogAttrs,
     updateDialogAttrs,
+    listDialogs,
     cleanup: timers.cleanup
   };
 }

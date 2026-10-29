@@ -17,16 +17,18 @@ libs/
 │   ├── constants.ts             # Injection keys, defaults
 │   └── type-helpers.ts          # RouteMap, TypedPush utilities
 ├── composables/
-│   ├── navigation/              # Navigation state (7 files)
+│   ├── navigation/              # Navigation state (8 files)
 │   │   ├── use-navigation.ts
 │   │   ├── use-navigation-guards.ts
 │   │   ├── use-navigation-history.ts
 │   │   ├── use-navigation-step-wise.ts
 │   │   ├── use-route-registry.ts
 │   │   ├── use-route-lifecycle.ts
+│   │   ├── use-page-events.ts   # tracker.onEvent page diff
 │   │   └── use-gesture-navigation.ts
-│   ├── dialog/                  # Dialog state (2 files)
+│   ├── dialog/                  # Dialog state (3 files)
 │   │   ├── use-dialog-manager.ts
+│   │   ├── use-dialog-events.ts # tracker.onEvent dialog events
 │   │   └── use-dialog-lifecycle.ts
 │   ├── control/                 # Control state (2 files)
 │   │   ├── use-control-manager.ts

@@ -15,7 +15,7 @@ import {
   MICRO_DIALOG_PATH_KEY
 } from '../core/constants';
 import { useMicroRouter } from '../composables/use-micro-router';
-import type { MicroDialog } from '../core/types';
+import type { CloseReason, MicroDialog } from '../core/types';
 import { lockBodyScroll, unlockBodyScroll } from '../utils/body-scroll-lock';
 import {
   focusInputWhenReady,
@@ -30,7 +30,7 @@ interface Props {
 }
 
 interface Emits {
-  (event: 'close', path: string): void;
+  (event: 'close', path: string, reason: CloseReason): void;
 }
 
 const props = defineProps<Props>();
@@ -64,7 +64,7 @@ function handleKeydown(e: KeyboardEvent) {
     if (props.dialog.persistent) return;
     e.preventDefault();
     e.stopPropagation();
-    emits('close', props.dialog.path);
+    emits('close', props.dialog.path, 'escape');
     return;
   }
   if (e.key !== 'Tab') return;
@@ -102,7 +102,7 @@ function handleKeydown(e: KeyboardEvent) {
 function handleBackdropClick(e: MouseEvent) {
   if (props.dialog.persistent) return;
   if (e.target === e.currentTarget) {
-    emits('close', props.dialog.path);
+    emits('close', props.dialog.path, 'backdrop');
   }
 }
 
@@ -193,6 +193,7 @@ onBeforeUnmount(() => {
   <Teleport to="body">
     <div
       class="micro-dialog-portal"
+      :data-micro-dialog="dialog.path"
       :class="[
         `micro-dialog--${position}`,
         dialog.fullscreen && 'micro-dialog--fullscreen',

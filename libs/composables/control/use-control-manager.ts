@@ -13,8 +13,14 @@ import {
   type ComputedRef
 } from 'vue';
 
-import type { MicroControl, PageTrackerHooks } from '../../core/types';
+import type {
+  CloseReason,
+  MicroControl,
+  MicroRouterRegistry,
+  PageTrackerHooks
+} from '../../core/types';
 import { isAsyncLoader, safeMarkRaw } from '../../utils/path-utils';
+import { createTrackerEvent, listDefinitions } from '../use-page-tracker';
 import { createTimerManager } from '../../utils/timer-manager';
 
 interface ControlManagerConfig {
@@ -35,6 +41,8 @@ export interface ControlManagerState {
   registerControls: (controls: MicroControl[]) => void;
   getControlAttrs: (name: string) => Record<string, unknown> | undefined;
   updateControlAttrs: (name: string, attrs: Record<string, unknown>) => void;
+  /** Registered control names with their `meta`, in registration order */
+  listControls: () => MicroRouterRegistry['controls'];
   cleanup: () => void;
 }
 
@@ -73,6 +81,35 @@ export function useControlManager(
     return nonDefault?.name ?? defaultName;
   });
 
+  /**
+   * `currentControl`, or `''` while no control is active — `currentControl`
+   * names the default GUI even then, which would read as a GUI shown.
+   */
+  function shownControl() {
+    return activeControls.value.length > 0 ? currentControl.value : '';
+  }
+
+  /**
+   * Fire the tracker for one control whose `activated` flipped — never for a
+   * set that leaves it as it was. Called after the toggle has settled, so
+   * `to` is already the new one.
+   */
+  function emitControl(
+    name: string,
+    phase: 'enter' | 'leave',
+    from: string,
+    closeReason?: CloseReason
+  ) {
+    if (phase === 'enter') tracker?.trackGuiEnter?.(name);
+    else tracker?.trackGuiLeave?.(name);
+    tracker?.onEvent?.(
+      createTrackerEvent(
+        { kind: 'control', phase, name, path: name, from, to: shownControl() },
+        { closeReason, meta: controls.get(name)?.meta }
+      )
+    );
+  }
+
   function toggleControl(
     name: string,
     active: boolean,
@@ -84,15 +121,18 @@ export function useControlManager(
       const control = controls.get(name);
       if (!control) return;
 
+      const from = shownControl();
       const defaultGUI = controls.get(defaultName);
       const isMainGui = name === defaultName || name === onboardingName;
+      // Leaves first, then enters — collected while state changes, fired once it has.
+      const left: Array<{ name: string; reason: CloseReason }> = [];
+      const entered: string[] = [];
 
       if (active) {
-        tracker?.trackGuiEnter?.(name);
         if (isMainGui) {
           controls.forEach((ctrl) => {
-            if (ctrl.name !== defaultName && ctrl.activated) {
-              tracker?.trackGuiLeave?.(ctrl.name);
+            if (ctrl.name !== defaultName && ctrl.name !== name && ctrl.activated) {
+              left.push({ name: ctrl.name, reason: 'replace' });
               controls.set(ctrl.name, {
                 ...ctrl,
                 activated: false,
@@ -101,9 +141,10 @@ export function useControlManager(
             }
           });
         } else if (defaultGUI?.activated) {
-          tracker?.trackGuiLeave?.(defaultName);
+          left.push({ name: defaultName, reason: 'replace' });
           controls.set(defaultName, { ...defaultGUI, activated: false });
         }
+        if (!control.activated) entered.push(name);
         if (attrs) controlAttrs.set(name, { ...attrs });
         controls.set(name, {
           ...control,
@@ -112,15 +153,23 @@ export function useControlManager(
           attrs: attrs ? { ...attrs } : undefined
         });
       } else {
-        tracker?.trackGuiLeave?.(name);
+        if (control.activated) left.push({ name, reason: 'programmatic' });
         controlAttrs.delete(name);
         controls.set(name, { ...control, activated: false, attrs: undefined });
         const updatedDefaultGUI = controls.get(defaultName);
-        if (!isMainGui && updatedDefaultGUI && !updatedDefaultGUI.activated) {
-          if (updatedDefaultGUI.name === onboardingName) return;
+        if (
+          !isMainGui &&
+          updatedDefaultGUI &&
+          !updatedDefaultGUI.activated &&
+          updatedDefaultGUI.name !== onboardingName
+        ) {
+          entered.push(defaultName);
           controls.set(defaultName, { ...updatedDefaultGUI, activated: true });
         }
       }
+
+      for (const leave of left) emitControl(leave.name, 'leave', from, leave.reason);
+      for (const enter of entered) emitControl(enter, 'enter', from);
     } finally {
       if (active) {
         timers.schedule(() => {
@@ -155,6 +204,10 @@ export function useControlManager(
     controlAttrs.set(name, { ...existing, ...attrs });
   }
 
+  function listControls(): MicroRouterRegistry['controls'] {
+    return listDefinitions(controls.values(), 'name');
+  }
+
   return {
     resolveControls,
     activeControl,
@@ -164,6 +217,7 @@ export function useControlManager(
     registerControls,
     getControlAttrs,
     updateControlAttrs,
+    listControls,
     cleanup: timers.cleanup
   };
 }

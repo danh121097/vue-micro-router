@@ -10,12 +10,14 @@
  *   npx vue-micro-router-gen                    # auto-detect, output to src/ or project root
  *   npx vue-micro-router-gen -o src/types.d.ts  # custom output
  *   npx vue-micro-router-gen -d src             # scan specific dir
+ *   npx vue-micro-router-gen --manifest         # also write micro-router.manifest.json
  *   npx vue-micro-router-gen --help
  */
 import {
   readFileSync,
   writeFileSync,
   existsSync,
+  mkdirSync,
   readdirSync,
   watch as fsWatch
 } from 'fs';
@@ -30,9 +32,16 @@ const args = process.argv.slice(2);
 let outputFile = '';
 let scanDir = '';
 let watchMode = false;
+let manifestFile = '';
 
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '-o' || args[i] === '--output') outputFile = args[++i];
+  else if (args[i] === '-m' || args[i] === '--manifest') {
+    // Optional value: `--manifest` alone uses the default name
+    const next = args[i + 1];
+    manifestFile =
+      next && !next.startsWith('-') ? args[++i] : 'micro-router.manifest.json';
+  }
   else if (args[i] === '-d' || args[i] === '--dir') scanDir = args[++i];
   else if (args[i] === '-w' || args[i] === '--watch') watchMode = true;
   else if (args[i] === '--help' || args[i] === '-h') {
@@ -44,6 +53,9 @@ Usage: npx vue-micro-router-gen [options]
 Options:
   -o, --output <file>   Output file (auto: src/vue-micro-router.d.ts or ./vue-micro-router.d.ts)
   -d, --dir <dir>       Directory to scan (auto-detects src/, app/, or cwd)
+  -m, --manifest [file] Also write a JSON manifest of every route, dialog and
+                        control with its literal \`meta\` and source file
+                        (default: micro-router.manifest.json)
   -w, --watch           Watch .vue/.ts files and regenerate on change
   -h, --help            Show this help
 
@@ -78,6 +90,7 @@ if (!outputFile) {
 
 console.log(`Scan: ${scanDir}/`);
 console.log(`Output: ${outputFile}`);
+if (manifestFile) console.log(`Manifest: ${manifestFile}`);
 
 // ── Walk ────────────────────────────────────────────────────────────────────
 
@@ -146,6 +159,12 @@ function extractBracketContent(str, pos) {
   let depth = 1,
     i = pos;
   while (i < str.length && depth > 0) {
+    // A bracket inside a string or comment is not one
+    const skipped = skipStringOrComment(str, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
     if (str[i] === '[') depth++;
     else if (str[i] === ']') depth--;
     i++;
@@ -157,11 +176,22 @@ function extractEntryBlocks(str) {
   const blocks = [];
   let i = 0;
   while (i < str.length) {
+    const skipped = skipStringOrComment(str, i);
+    if (skipped !== i) {
+      i = skipped;
+      continue;
+    }
     if (str[i] === '{') {
       let d = 1,
         s = i;
       i++;
       while (i < str.length && d > 0) {
+        // Braces inside strings and comments do not end the entry
+        const inner = skipStringOrComment(str, i);
+        if (inner !== i) {
+          i = inner;
+          continue;
+        }
         if (str[i] === '{') d++;
         else if (str[i] === '}') d--;
         i++;
@@ -170,6 +200,178 @@ function extractEntryBlocks(str) {
     } else i++;
   }
   return blocks;
+}
+
+// ── Literal meta ────────────────────────────────────────────────────────────
+
+/** Skip a quoted string starting at `i` (the quote); returns the index after it. */
+function skipString(str, i) {
+  const quote = str[i++];
+  while (i < str.length && str[i] !== quote) i += str[i] === '\\' ? 2 : 1;
+  return i + 1;
+}
+
+/**
+ * Index after the string or comment that starts at `i`, or `i` when none does.
+ * Comments are skipped like strings, so a `// don't` never opens a quote.
+ */
+function skipStringOrComment(str, i) {
+  const ch = str[i];
+  if (ch === '"' || ch === "'" || ch === '`') return skipString(str, i);
+  if (str.startsWith('//', i)) {
+    const end = str.indexOf('\n', i);
+    return end === -1 ? str.length : end;
+  }
+  if (str.startsWith('/*', i)) {
+    const end = str.indexOf('*/', i + 2);
+    return end === -1 ? str.length : end + 2;
+  }
+  return i;
+}
+
+/**
+ * Source text of the `meta` value of an entry block, at the block's own top
+ * level (not a `meta` nested in attrs). `undefined` when the entry has none.
+ */
+function findMetaSource(block) {
+  let depth = 0;
+  for (let i = 0; i < block.length; i++) {
+    const skipped = skipStringOrComment(block, i);
+    if (skipped !== i) {
+      i = skipped - 1;
+      continue;
+    }
+    const ch = block[i];
+    if ('{[('.includes(ch)) depth++;
+    else if ('}])'.includes(ch)) depth--;
+    if (depth !== 1 || !block.startsWith('meta', i)) continue;
+    if (/[\w$]/.test(block[i - 1] ?? '')) continue;
+    const key = block.slice(i).match(/^meta\s*:\s*/);
+    // Shorthand `{ meta }` or a method `meta() {}`: present, but not a literal
+    if (!key) {
+      if (/^meta\s*([,}(]|$)/.test(block.slice(i))) return 'meta';
+      continue;
+    }
+    const start = i + key[0].length;
+    // Balanced value up to the next top-level `,` or the entry's closing `}`
+    let d = 0;
+    for (let j = start; j < block.length; j++) {
+      const skippedValue = skipStringOrComment(block, j);
+      if (skippedValue !== j) {
+        j = skippedValue - 1;
+        continue;
+      }
+      const c = block[j];
+      if ('{[('.includes(c)) d++;
+      else if ('}])'.includes(c)) {
+        if (d === 0) return block.slice(start, j).trim();
+        d--;
+      } else if (c === ',' && d === 0) return block.slice(start, j).trim();
+    }
+    return block.slice(start).trim();
+  }
+  return undefined;
+}
+
+const SIMPLE_ESCAPES = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', v: '\v', 0: '\0' };
+
+/**
+ * JS string escapes decoded as the engine would; `null` for one it cannot
+ * decode (`\u{zz}`, `\x4`), so the caller treats the meta as non-literal
+ * instead of writing a mangled value.
+ */
+function decodeEscapes(body) {
+  let bad = false;
+  const decoded = body.replace(
+    /\\(u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|x([0-9a-fA-F]{2})|[ux]|\r\n|[\s\S])/g,
+    (whole, esc, braced, u4, x2) => {
+      const hex = braced ?? u4 ?? x2;
+      if (hex !== undefined) {
+        const code = parseInt(hex, 16);
+        if (code > 0x10ffff) bad = true;
+        return bad ? '' : String.fromCodePoint(code);
+      }
+      if (esc === 'u' || esc === 'x') bad = true;
+      // A backslash before a line break continues the string
+      if (esc === '\n' || esc === '\r\n' || esc === '\r') return '';
+      return SIMPLE_ESCAPES[esc] ?? esc;
+    }
+  );
+  return bad ? null : decoded;
+}
+
+/**
+ * Parse a JS literal — objects, arrays, strings, numbers, booleans, null —
+ * without evaluating anything. Throws on any other expression.
+ */
+function parseLiteral(src) {
+  let i = 0;
+  const fail = () => {
+    throw new Error(`not a literal at ${i}`);
+  };
+  const ws = () => {
+    for (;;) {
+      while (i < src.length && /\s/.test(src[i])) i++;
+      if (src.startsWith('//', i)) i = src.indexOf('\n', i) === -1 ? src.length : src.indexOf('\n', i);
+      else if (src.startsWith('/*', i)) i = src.indexOf('*/', i) + 2 || fail();
+      else return;
+    }
+  };
+  const string = () => {
+    const quote = src[i];
+    const end = skipString(src, i);
+    const body = src.slice(i + 1, end - 1);
+    if (quote === '`' && body.includes('${')) fail();
+    i = end;
+    return decodeEscapes(body) ?? fail();
+  };
+  const value = () => {
+    ws();
+    const ch = src[i];
+    if (ch === '{') {
+      i++;
+      const obj = {};
+      for (;;) {
+        ws();
+        if (src[i] === '}') { i++; return obj; }
+        let key;
+        if (src[i] === '"' || src[i] === "'") key = string();
+        else {
+          const m = src.slice(i).match(/^[A-Za-z_$][\w$]*|^\d+/);
+          if (!m) fail();
+          key = m[0];
+          i += key.length;
+        }
+        ws();
+        if (src[i++] !== ':') fail();
+        obj[key] = value();
+        ws();
+        if (src[i] === ',') i++;
+        else if (src[i] !== '}') fail();
+      }
+    }
+    if (ch === '[') {
+      i++;
+      const arr = [];
+      for (;;) {
+        ws();
+        if (src[i] === ']') { i++; return arr; }
+        arr.push(value());
+        ws();
+        if (src[i] === ',') i++;
+        else if (src[i] !== ']') fail();
+      }
+    }
+    if (ch === '"' || ch === "'" || ch === '`') return string();
+    const m = src.slice(i).match(/^(-?\d+(\.\d+)?([eE][+-]?\d+)?|true|false|null)(?![\w$])/);
+    if (!m) fail();
+    i += m[0].length;
+    return JSON.parse(m[0]);
+  };
+  const result = value();
+  ws();
+  if (src.slice(i).replace(/^as\s+const/, '').trim()) fail();
+  return result;
 }
 
 // ── Plugin extraction ───────────────────────────────────────────────────────
@@ -233,7 +435,13 @@ function extractEntries(filePath) {
           if (imp) componentFile = resolveComponent(dir, imp[1]);
         }
 
-        entries.push({ kind, key: keyMatch[1], componentFile });
+        entries.push({
+          kind,
+          key: keyMatch[1],
+          componentFile,
+          source: relative(CWD, filePath),
+          metaSource: findMetaSource(block)
+        });
       }
     }
   }
@@ -250,6 +458,67 @@ function hasAttrs(filePath) {
   }
 }
 
+// ── Manifest ────────────────────────────────────────────────────────────────
+
+/** Write `content` only when it changed — prevents unnecessary HMR/reload triggers */
+function writeIfChanged(file, content) {
+  const outPath = resolve(CWD, file);
+  let existing = '';
+  try {
+    existing = readFileSync(outPath, 'utf-8');
+  } catch {
+    // File doesn't exist yet — first run
+  }
+  if (existing === content) {
+    console.log(`✅ ${file} (unchanged)`);
+    return;
+  }
+  mkdirSync(dirname(outPath), { recursive: true });
+  writeFileSync(outPath, content);
+  console.log(`✅ ${file}`);
+}
+
+/**
+ * Every route, dialog and control with its source file and `meta`, sorted by
+ * name so the file only changes when a definition does. `meta` is read as a
+ * literal; anything else (a variable, a call, a template string with
+ * `${}`) is written as `null` with a warning.
+ */
+function writeManifest(entries) {
+  const toPosix = (p) => p.replace(/\\/g, '/');
+  const sections = { route: [], dialog: [], control: [] };
+  for (const e of entries) {
+    const item = {
+      [e.kind === 'control' ? 'name' : 'path']: e.key,
+      source: toPosix(e.source),
+      component: e.componentFile ? toPosix(e.componentFile) : null
+    };
+    if (e.metaSource !== undefined) {
+      try {
+        item.meta = parseLiteral(e.metaSource);
+      } catch {
+        console.warn(
+          `⚠️  ${e.source}: ${e.kind} '${e.key}' meta is not a literal — written as null`
+        );
+        item.meta = null;
+      }
+    }
+    sections[e.kind].push(item);
+  }
+  const byKey = (a, b) => {
+    const ka = a.path ?? a.name;
+    const kb = b.path ?? b.name;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  };
+  const manifest = {
+    version: 1,
+    routes: sections.route.sort(byKey),
+    dialogs: sections.dialog.sort(byKey),
+    controls: sections.control.sort(byKey)
+  };
+  writeIfChanged(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 // ── Generate ────────────────────────────────────────────────────────────────
 
 function generate() {
@@ -263,6 +532,7 @@ function generate() {
   plugins.forEach((p) => console.log(`  ${p.relPath} → ${p.exportName}`));
 
   const allEntries = plugins.flatMap((p) => extractEntries(p.absPath));
+  if (manifestFile) writeManifest(allEntries);
 
   const typed = { route: [], dialog: [], control: [] };
   const untyped = { route: 0, dialog: 0, control: 0 };
@@ -337,21 +607,7 @@ function generate() {
   }
 
   lines.push('}', '');
-  const newContent = lines.join('\n');
-  const outPath = resolve(CWD, outputFile);
-  // Only write if content actually changed — prevents unnecessary HMR/reload triggers
-  let existing = '';
-  try {
-    existing = readFileSync(outPath, 'utf-8');
-  } catch {
-    // File doesn't exist yet — first run
-  }
-  if (existing === newContent) {
-    console.log(`✅ ${outputFile} (unchanged)`);
-    return true;
-  }
-  writeFileSync(outPath, newContent);
-  console.log(`✅ ${outputFile}`);
+  writeIfChanged(outputFile, lines.join('\n'));
   return true;
 }
 

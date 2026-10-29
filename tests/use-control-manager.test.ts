@@ -1,9 +1,13 @@
-import { describe, expect, mock, test } from 'bun:test';
+import { describe, expect, mock, spyOn, test } from 'bun:test';
 
 import { useControlManager } from '../libs/composables/control/use-control-manager';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
+import type { TrackerEvent } from '../libs/core/types';
 
 const fakeComponent = { render: () => null };
+
+/** Activation is locked for 300ms after each one; wait it out. */
+const releaseGuard = () => new Promise((r) => setTimeout(r, 350));
 
 function createControlManager(
   config: { defaultControlName?: string; onboardingControlName?: string } = {}
@@ -234,6 +238,129 @@ describe('useControlManager', () => {
     expect(trackGuiEnter).toHaveBeenCalledWith('main_gui');
     cm.toggleControl('main_gui', false);
     expect(trackGuiLeave).toHaveBeenCalledWith('main_gui');
+  });
+
+  test('deactivating a non-default control reports main_gui coming back', async () => {
+    const trackGuiEnter = mock((_name: string) => {});
+    const trackGuiLeave = mock((_name: string) => {});
+    const tracker = usePageTracker({ trackGuiEnter, trackGuiLeave });
+    const cm = useControlManager({ defaultControlName: 'main_gui' }, tracker);
+    cm.registerControls([
+      { name: 'main_gui', component: fakeComponent, activated: false },
+      { name: 'inventory', component: fakeComponent, activated: false }
+    ]);
+    cm.toggleControl('main_gui', true);
+    await releaseGuard();
+    cm.toggleControl('inventory', true);
+    trackGuiEnter.mockClear();
+    trackGuiLeave.mockClear();
+
+    cm.toggleControl('inventory', false);
+
+    expect(trackGuiLeave.mock.calls).toEqual([['inventory']]);
+    expect(trackGuiEnter.mock.calls).toEqual([['main_gui']]);
+    cm.cleanup();
+  });
+
+  test('gui hooks fire only when a control actually changes', async () => {
+    const trackGuiEnter = mock((_name: string) => {});
+    const trackGuiLeave = mock((_name: string) => {});
+    const tracker = usePageTracker({ trackGuiEnter, trackGuiLeave });
+    const cm = useControlManager({ defaultControlName: 'main_gui' }, tracker);
+    cm.registerControls([
+      { name: 'main_gui', component: fakeComponent, activated: false },
+      { name: 'inventory', component: fakeComponent, activated: false }
+    ]);
+    cm.toggleControl('main_gui', true);
+    await releaseGuard();
+    trackGuiEnter.mockClear();
+
+    cm.toggleControl('main_gui', true); // already shown
+    cm.toggleControl('inventory', false); // already hidden, main_gui already shown
+
+    expect(trackGuiEnter).not.toHaveBeenCalled();
+    expect(trackGuiLeave).not.toHaveBeenCalled();
+    cm.cleanup();
+  });
+
+  test('onEvent reports each control change, leaves before enters, with reason and meta', async () => {
+    const events: TrackerEvent[] = [];
+    const tracker = usePageTracker({ onEvent: (e) => events.push(e) });
+    const cm = useControlManager({ defaultControlName: 'main_gui' }, tracker);
+    cm.registerControls([
+      { name: 'main_gui', component: fakeComponent, activated: false },
+      {
+        name: 'inventory',
+        component: fakeComponent,
+        activated: false,
+        meta: { gui: 'bag' }
+      }
+    ]);
+    cm.toggleControl('main_gui', true);
+    await releaseGuard();
+    cm.toggleControl('inventory', true);
+    cm.toggleControl('inventory', false);
+
+    expect(events).toEqual([
+      { kind: 'control', phase: 'enter', name: 'main_gui', path: 'main_gui', from: '', to: 'main_gui' },
+      { kind: 'control', phase: 'leave', name: 'main_gui', path: 'main_gui', from: 'main_gui', to: 'inventory', closeReason: 'replace' },
+      { kind: 'control', phase: 'enter', name: 'inventory', path: 'inventory', from: 'main_gui', to: 'inventory', meta: { gui: 'bag' } },
+      { kind: 'control', phase: 'leave', name: 'inventory', path: 'inventory', from: 'inventory', to: 'main_gui', closeReason: 'programmatic', meta: { gui: 'bag' } },
+      { kind: 'control', phase: 'enter', name: 'main_gui', path: 'main_gui', from: 'inventory', to: 'main_gui' }
+    ]);
+    cm.cleanup();
+  });
+
+  test('onEvent reports no control as an empty from / to', () => {
+    const events: TrackerEvent[] = [];
+    const cm = useControlManager(
+      { defaultControlName: 'main_gui' },
+      usePageTracker({ onEvent: (e) => events.push(e) })
+    );
+    cm.registerControl({ name: 'main_gui', component: fakeComponent, activated: false });
+    cm.toggleControl('main_gui', true);
+    cm.toggleControl('main_gui', false);
+    expect(events.map((e) => [e.phase, e.from, e.to])).toEqual([
+      ['enter', '', 'main_gui'],
+      ['leave', 'main_gui', '']
+    ]);
+    cm.cleanup();
+  });
+
+  test('a throwing onEvent does not stop the toggle or the hooks after it', () => {
+    const trackGuiEnter = mock((_name: string) => {});
+    const warn = spyOn(console, 'warn').mockImplementation(() => {});
+    const cm = useControlManager(
+      { defaultControlName: 'main_gui' },
+      usePageTracker({
+        trackGuiEnter,
+        onEvent: () => {
+          throw new Error('tracker down');
+        }
+      })
+    );
+    cm.registerControls([
+      { name: 'main_gui', component: fakeComponent, activated: false },
+      { name: 'inventory', component: fakeComponent, activated: false }
+    ]);
+    cm.toggleControl('inventory', true);
+    expect(trackGuiEnter.mock.calls).toEqual([['inventory']]);
+    expect(cm.currentControl.value).toBe('inventory');
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
+    cm.cleanup();
+  });
+
+  test('listControls returns names and meta in registration order', () => {
+    const cm = createControlManager();
+    cm.registerControls([
+      { name: 'main_gui', component: fakeComponent, activated: false },
+      { name: 'inventory', component: fakeComponent, activated: false, meta: { gui: 'bag' } }
+    ]);
+    expect(cm.listControls()).toEqual([
+      { name: 'main_gui' },
+      { name: 'inventory', meta: { gui: 'bag' } }
+    ]);
   });
 
   test('onboarding control does not auto-restore default', () => {

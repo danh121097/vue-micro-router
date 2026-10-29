@@ -16,6 +16,9 @@ openDialog('confirm', {
 // Close specific dialog
 closeDialog('confirm');
 
+// From the dialog's own close button — reported as tracker closeReason
+closeDialog('confirm', 'close_button');
+
 // Close all open dialogs
 closeAllDialogs();
 ```
@@ -33,6 +36,7 @@ registerDialog({
   fullscreen: false,
   persistent: true,           // prevent close on backdrop click / Escape
   seamless: true,             // transparent background, no shadow
+  meta: { screen: 'settings' }, // free-form — handed to tracker.onEvent and getRegistry()
 });
 ```
 

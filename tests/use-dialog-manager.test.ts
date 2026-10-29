@@ -2,6 +2,7 @@ import { describe, expect, mock, test } from 'bun:test';
 
 import { useDialogManager } from '../libs/composables/dialog/use-dialog-manager';
 import { usePageTracker } from '../libs/composables/use-page-tracker';
+import type { TrackerEvent } from '../libs/core/types';
 
 function createDialogManager() {
   const tracker = usePageTracker();
@@ -147,5 +148,77 @@ describe('useDialogManager', () => {
     expect(trackDialogEnter).toHaveBeenCalled();
     dm.closeDialog('a');
     expect(trackDialogLeave).toHaveBeenCalled();
+  });
+
+  describe('onEvent', () => {
+    const settle = (ms = 350) => new Promise((r) => setTimeout(r, ms));
+
+    function createTracked() {
+      const events: TrackerEvent[] = [];
+      const dm = useDialogManager(usePageTracker({ onEvent: (e) => events.push(e) }));
+      dm.registerDialogs([
+        { path: 'a', component: fakeComponent, activated: false },
+        { path: 'b', component: fakeComponent, activated: false, meta: { screen: 'bee' } }
+      ]);
+      return { dm, events };
+    }
+
+    test('a dialog over another covers it; closing it uncovers the one below', async () => {
+      const { dm, events } = createTracked();
+      dm.openDialog('a');
+      await settle();
+      dm.openDialog('b');
+      await settle(50);
+      dm.closeDialog('b');
+      await settle(50);
+
+      expect(events).toEqual([
+        { kind: 'dialog', phase: 'enter', name: 'a', path: 'a', from: '', to: 'a' },
+        { kind: 'dialog', phase: 'cover', name: 'a', path: 'a', from: 'a', to: 'b' },
+        { kind: 'dialog', phase: 'enter', name: 'b', path: 'b', from: 'a', to: 'b', meta: { screen: 'bee' } },
+        { kind: 'dialog', phase: 'leave', name: 'b', path: 'b', from: 'b', to: 'a', closeReason: 'programmatic', meta: { screen: 'bee' } },
+        { kind: 'dialog', phase: 'uncover', name: 'a', path: 'a', from: 'b', to: 'a' }
+      ]);
+      dm.cleanup();
+    });
+
+    test('closeDialog reports the reason it is given', async () => {
+      const { dm, events } = createTracked();
+      dm.openDialog('a');
+      await settle(50);
+      dm.closeDialog('a', 'close_button');
+      await settle(50);
+      expect(events.at(-1)).toMatchObject({ phase: 'leave', name: 'a', closeReason: 'close_button' });
+      dm.cleanup();
+    });
+
+    test('closing a dialog that is not open reports nothing', async () => {
+      const { dm, events } = createTracked();
+      dm.closeDialog('a');
+      await settle(50);
+      expect(events).toEqual([]);
+      dm.cleanup();
+    });
+
+    test('closeAllDialogs reports each open dialog leaving, top first', async () => {
+      const { dm, events } = createTracked();
+      dm.openDialog('a');
+      await settle();
+      dm.openDialog('b');
+      await settle(50);
+      events.length = 0;
+
+      dm.closeAllDialogs();
+      expect(events.map((e) => [e.phase, e.name, e.closeReason, e.to])).toEqual([
+        ['leave', 'b', 'programmatic', ''],
+        ['leave', 'a', 'programmatic', '']
+      ]);
+      dm.cleanup();
+    });
+
+    test('listDialogs returns paths and meta in registration order', () => {
+      const { dm } = createTracked();
+      expect(dm.listDialogs()).toEqual([{ path: 'a' }, { path: 'b', meta: { screen: 'bee' } }]);
+    });
   });
 });

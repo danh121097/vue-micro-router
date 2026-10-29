@@ -72,6 +72,60 @@ const config: MicroRouterConfig = {
 };
 ```
 
+`trackGuiEnter` / `trackGuiLeave` fire once per control whose activation
+actually changes — including the default GUI coming back when another control
+is turned off — and also when the stack leaves / returns to the default page.
+
+### `onEvent` — one stream for pages, dialogs and controls
+
+```ts
+tracker: {
+  onEvent: (e) => analytics.track(`${e.kind}_${e.phase}`, e),
+}
+```
+
+Each `TrackerEvent` is `{ kind, phase, name, path, from, to, navigationKind?, closeReason?, meta? }`:
+
+| Field | Meaning |
+|-------|---------|
+| `kind` | `'page'`, `'dialog'` or `'control'` |
+| `phase` | `'enter'` / `'leave'` — mounted into / removed from its stack (a control: activated / deactivated). `'cover'` / `'uncover'` — still mounted, but another page (pages) or dialog (dialogs) went on top of it / went away. Controls never cover. |
+| `name` / `path` | Segment and its full stack path (`menu`, `/home/menu`); dialog path; control name |
+| `from` / `to` | Before → after: active path, top dialog, or `currentControl` — `''` where there is none |
+| `navigationKind` | Page events: `'push'`, `'back'` or `'replace'` |
+| `closeReason` | `leave` only: `'escape'` and `'backdrop'` (dialog dismissed itself), `'close_button'` (`closeDialog(path, 'close_button')`), `'gesture'` (swipe back), `'replace'` (`replace()`, or another control took this control's place), else `'programmatic'` |
+| `meta` | The definition's `meta`, when it has one |
+
+Within one change, leaves come first, then covers, uncovers and enters; a page
+is covered only after its own enter (an absolute push to `/b/c` reports
+`enter b`, `cover b`, `enter c`). A multi-step back reports a
+`leave` for every page it removes, top first. Dialog events arrive when the
+dialog stack actually changes — the tick after `openDialog` / `closeDialog`,
+with `activeDialog` — and re-opening a dialog that is already open reports
+nothing. Page-level GUI hiding (leaving
+the default page) is reported to `trackGuiLeave` only, not as a control event.
+The `track*` hooks still fire alongside `onEvent`; the GUI hooks now follow
+the activation changes described above.
+
+### `meta`, owner attributes and the registry
+
+- Any route, dialog or control can carry `meta: Record<string, unknown>`. The
+  router never reads it; it rides along on every `onEvent` and in
+  `store.getRegistry()`.
+- The wrappers carry their owner for `closest()` lookups: `.route-page` has
+  `data-micro-page="<segment>"`, `.micro-dialog-portal` has
+  `data-micro-dialog="<path>"`, and a control's root element gets
+  `data-micro-control="<name>"`. The router sets it on the element after each
+  render of the control; a control whose root is not a single element (a
+  fragment or a teleport) does not get it.
+- `store.getRegistry()` returns `{ routes, dialogs, controls }` — every
+  registered path or name with its `meta`, in registration order.
+- `npx vue-micro-router-gen --manifest [file]` writes the same list from source,
+  with each definition's plugin file and component, to
+  `micro-router.manifest.json` (sorted by name). `meta` is read as a literal; a
+  non-literal `meta` (a variable, shorthand `{ meta }`, a call) is written as
+  `null` with a warning.
+
 ## Vue Devtools
 
 Opt in with `config.devtools: true` — shows a "Micro Router" inspector tab with:

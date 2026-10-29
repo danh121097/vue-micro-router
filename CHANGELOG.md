@@ -2,6 +2,90 @@
 
 ## Unreleased
 
+### Fixed
+
+- **GUI hooks report every control activation change.** `trackGuiEnter` /
+  `trackGuiLeave` now fire exactly when a control's `activated` flips:
+  - `trackGuiEnter(defaultControlName)` fires when turning a control off brings
+    the default GUI (`main_gui`) back. Before, it came back silently, so a
+    consumer counting shown GUIs had to watch `resolveControls` instead.
+  - **Behaviour change:** no `trackGuiLeave` for a control that was already
+    hidden, and no second `trackGuiEnter` for a control that was already shown
+    (re-toggling still remounts it with the new attrs).
+  - **Behaviour change:** within one `toggleControl`, the hides are reported
+    before the show (it was show first).
+  - The page-level GUI hooks (leaving / returning to the default page) are
+    unchanged.
+
+- **`vue-micro-router-gen` cuts plugin entries correctly around braces in
+  comments and strings.** A `{` or `}` inside a comment or a string in a
+  `routes` / `dialogs` / `controls` entry used to end the entry early or drop
+  the next one from the generated types. Projects without such a brace get
+  byte-identical output.
+
+### Added
+
+- **`tracker.onEvent(event)`** — one stream for pages, dialogs and controls,
+  alongside the existing `track*` hooks (which keep firing, with the GUI hook
+  fix above). Each
+  `TrackerEvent` is `{ kind, phase, name, path, from, to, navigationKind?,
+  closeReason?, meta? }`:
+  - `phase` is `enter` / `leave` (mounted into / removed from the stack; a
+    control activated / deactivated) or `cover` / `uncover` (another page or
+    dialog went on top / went away). Pages cover pages, dialogs cover dialogs;
+    controls never cover.
+  - Every page has one `enter` and one `leave`: a multi-step back reports each
+    page it removes, top first, which the `trackPageLeave` hook never did.
+  - `closeReason` on leaves: `escape` and `backdrop` (from where the dialog
+    already handles them, never for a `persistent` dialog), `close_button`
+    (when the caller passes it), `gesture` (swipe back), `replace` (`replace()`,
+    or another control taking this one's place), else `programmatic`.
+  - Within one change, leaves come first; a page is covered only after its own
+    enter (an absolute push to `/b/c` reports `enter b`, `cover b`, `enter c`).
+  - A throwing `onEvent` is caught and logged with `console.warn`, so it never
+    stops a navigation or the hooks after it.
+  - `from` / `to` are `''` where there is nothing: before the first page, with
+    no dialog open, or with no control active.
+  - Dialog events arrive when the dialog stack changes (the tick after
+    `openDialog` / `closeDialog`); re-opening an open dialog reports nothing.
+- **`closeDialog(path, reason?)`** — optional `CloseReason`, reported on
+  `onEvent`. Default `'programmatic'`. `PluginTypedCloseDialog` accepts it too.
+- **`meta`** — optional `Record<string, unknown>` on `MicroRoute`,
+  `MicroDialog` and `MicroControl`. Never read by the router; passed on
+  `onEvent` and by `getRegistry()`.
+- **Owner attributes** for `closest()` lookups: `data-micro-page="<segment>"`
+  on `.route-page`, `data-micro-dialog="<path>"` on `.micro-dialog-portal`,
+  and `data-micro-control="<name>"` on a control's root element, set after
+  each render (a control whose root is a fragment or a teleport does not get
+  it, and no Vue warning is raised).
+- **`store.getRegistry()`** — `{ routes, dialogs, controls }`: every
+  registered path or name with its `meta`, in registration order.
+- **`vue-micro-router-gen --manifest [file]`** — also writes
+  `micro-router.manifest.json`: every route, dialog and control with its plugin
+  file, component file and literal `meta`, sorted by name. A non-literal `meta`
+  (including shorthand `{ meta }`, or a string escape it cannot decode) is
+  written as `null` with a warning; comments are skipped. Without the flag,
+  the generated `.d.ts` is byte-identical to before.
+- Exported types: `TrackerEvent`, `TrackerEventKind`, `TrackerEventPhase`,
+  `CloseReason`, `MicroMeta`, `MicroRouterRegistry`.
+
+### Changed — consumer-visible
+
+- **`MicroRouterStore` has a new required member, `getRegistry`**, and
+  `NavigationState`, `DialogManagerState` and `ControlManagerState` gained
+  members (`listRoutes`, `trackCurrentPage`, `withLeaveReason`, `listDialogs`,
+  `listControls`). Code that builds one as an object literal (a hand-written
+  mock) must add them; code that reads the store, or casts with
+  `as unknown as MicroRouterStore`, is unaffected.
+- `usePageTracker()` returns `Required<PageTrackerHooks>`, which now includes
+  `onEvent`; a hand-built tracker object passed to `useNavigation`,
+  `useDialogManager` or `useControlManager` must add it.
+- `MicroDialogComponent`'s `close` event has a second argument, the
+  `CloseReason` (`'escape'` or `'backdrop'`). Listeners that take only the
+  path are unaffected.
+
+## 1.1.3 — 2026-10-28
+
 ### Added
 
 - **`replace(segment, props?)`** on the store and the `useMicroRouter()`

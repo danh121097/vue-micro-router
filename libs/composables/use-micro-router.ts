@@ -48,6 +48,19 @@ import { useDialogManager } from './dialog/use-dialog-manager';
 import { useNavigation } from './navigation/use-navigation';
 import { usePageTracker } from './use-page-tracker';
 
+/** What `MicroRouterView` needs from the store it created, kept off the public store. */
+interface StoreInternals {
+  /** `push(-1)` whose page leave reports `closeReason: 'gesture'` */
+  backByGesture: () => Promise<void>;
+}
+
+const storeInternals = new WeakMap<MicroRouterStore, StoreInternals>();
+
+/** Internal — read by `MicroRouterView` for the store `useGlobalMicroRouter` returned. */
+export function getStoreInternals(store: MicroRouterStore): StoreInternals | undefined {
+  return storeInternals.get(store);
+}
+
 /**
  * Create and provide the MicroRouter store.
  * Call once in the root MicroRouterView component.
@@ -151,6 +164,13 @@ export function useGlobalMicroRouter(
     getControlAttrs: controls.getControlAttrs,
     updateControlAttrs: controls.updateControlAttrs,
 
+    // Registry
+    getRegistry: () => ({
+      routes: navigation.listRoutes(),
+      dialogs: dialogs.listDialogs(),
+      controls: controls.listControls()
+    }),
+
     // Serialization
     serialize: () => serializeState(store),
     restore: (state) => restoreState(store, state),
@@ -166,6 +186,10 @@ export function useGlobalMicroRouter(
         }
       : {})
   };
+
+  storeInternals.set(store, {
+    backByGesture: () => navigation.withLeaveReason('gesture', () => store.push(-1))
+  });
 
   /**
    * Devtools module handle — resolved only when `config.devtools` is on.
@@ -220,6 +244,7 @@ export function useGlobalMicroRouter(
       undefined,
       navigation.activePath.value
     );
+    navigation.trackCurrentPage();
     if (audio) {
       document.addEventListener('visibilitychange', audio.handleVisibilityChange);
     }

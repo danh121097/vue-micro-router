@@ -249,6 +249,7 @@ const { title, message, onConfirm } = useMicroState<Attrs>({
 npx vue-micro-router-gen          # auto-detects src/ or app/, outputs src/vue-micro-router.d.ts
 npx vue-micro-router-gen -d src   # explicit scan directory
 npx vue-micro-router-gen -o types/router.d.ts  # custom output path
+npx vue-micro-router-gen --manifest  # also write micro-router.manifest.json (routes, dialogs, controls, meta)
 ```
 
 The script:

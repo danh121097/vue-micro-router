@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 
-import { useGlobalMicroRouter } from '../composables/use-micro-router';
+import { getStoreInternals, useGlobalMicroRouter } from '../composables/use-micro-router';
 import { useGestureNavigation } from '../composables/navigation/use-gesture-navigation';
 import { registerFeaturePlugins } from '../plugins/feature-plugin-manager';
 import type { FeaturePlugin, MicroRouterConfig } from '../core/types';
@@ -112,7 +112,7 @@ const pageStyles = computed(() => {
 if (props.config.gesture?.enabled) {
   useGestureNavigation(props.config.gesture, {
     containerRef: pageContainerRef,
-    goBack: () => store.push(-1),
+    goBack: () => getStoreInternals(store)?.backByGesture() ?? store.push(-1),
     canGoBack: () => resolveRoutes.value.length > 1
   });
 }
