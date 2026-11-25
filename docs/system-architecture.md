@@ -457,7 +457,9 @@ as long as the plugin was dead code; it never emitted more than the one.
   inside the library, so the chunk still ships (measured on a Vite 6 consumer:
   eager entry −2,753 B, total emitted +793 B). What it buys is a smaller eager
   entry and a fetch that never happens
-- Optional dependency: @vue/devtools-api — without it the load warns and no-ops
+- Optional dependency: @vue/devtools-api 6, 7 or 8 — without it the load warns and no-ops
+- The plugin descriptor names the Vue app hosting the router: the devtools kit
+  runs a plugin's setup only for the app its descriptor names
 
 Earlier releases gated this on `import.meta.env.DEV`, which the library build
 substituted to a constant `false`. That made the plugin unreachable for every

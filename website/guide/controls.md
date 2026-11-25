@@ -141,8 +141,8 @@ const config: MicroRouterConfig = {
 };
 ```
 
-Requires `@vue/devtools-api` (optional peer dependency); without it the load
-warns and no-ops. The inspector is loaded with a dynamic `import()`, so it is a
+Requires `@vue/devtools-api` 6, 7 or 8 (optional peer dependency); without it
+the load warns and no-ops. The inspector is loaded with a dynamic `import()`, so it is a
 separate chunk that is never fetched while the flag is off, and the core entry
 carries none of it.
 

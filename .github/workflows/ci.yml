@@ -68,11 +68,14 @@ jobs:
           # new API, not a regression. Raised to 14442 for the tracking hooks
           # (tracker.onEvent, close reasons, meta, owner attributes,
           # getRegistry): +1463 B over the base, measured locally (13001 →
-          # 14464) and added to the base CI measured (12979). Raise it only
-          # for a feature, never to absorb growth nobody can name.
+          # 14464) and added to the base CI measured (12979). Raised to 14503
+          # for the devtools fix that names the host app in the plugin
+          # descriptor (+61 B, measured locally 14464 → 14525): without it
+          # the inspector never registers. Raise it only for a feature or a
+          # named fix, never to absorb growth nobody can name.
           size=$(gzip -c dist/index.mjs | wc -c)
-          echo "dist/index.mjs: ${size} B gzip (baseline ceiling 14442)"
-          test "$size" -le 14442 || exit 1
+          echo "dist/index.mjs: ${size} B gzip (baseline ceiling 14503)"
+          test "$size" -le 14503 || exit 1
 
   # Build the VitePress docs and deploy to Cloudflare Pages.
   deploy-docs:

@@ -4,6 +4,28 @@
 
 ### Fixed
 
+- **The Vue Devtools inspector now registers.** The devtools plugin descriptor
+  now names the Vue app hosting the router (`app`). `@vue/devtools-api`
+  requires that field, and the devtools kit behind versions 7 and 8 skips any
+  plugin that does not name the app it inspects. So with
+  `config.devtools: true`, the "Micro Router" inspector and timeline never
+  appeared in a real devtools session. The plugin registers with the app of
+  the first router that turns devtools on. A router that remounts in the same
+  app (a `v-if`, a hot reload) reuses that registration rather than adding a
+  second inspector tab.
+
+### Changed — consumer-visible
+
+- **`@vue/devtools-api` 8 is accepted.** The optional peer range is now
+  `^6.0.0 || ^7.0.0 || ^8.0.0`. An app on pinia 4 or vue-router 5, which need
+  `@vue/devtools-api` ^8.2.1, now installs without npm's `ERESOLVE` peer
+  error. The integration makes the same calls on 6, 7 and 8. No consumer code
+  changes.
+
+## 1.1.4 — 2026-10-29
+
+### Fixed
+
 - **GUI hooks report every control activation change.** `trackGuiEnter` /
   `trackGuiLeave` now fire exactly when a control's `activated` flips:
   - `trackGuiEnter(defaultControlName)` fires when turning a control off brings

@@ -651,8 +651,8 @@ const config: MicroRouterConfig = {
 };
 ```
 
-Requires `@vue/devtools-api` (optional peer dependency); without it the load
-warns and no-ops. The inspector is loaded with a dynamic `import()`, so it is a
+Requires `@vue/devtools-api` 6, 7 or 8 (optional peer dependency); without it
+the load warns and no-ops. The inspector is loaded with a dynamic `import()`, so it is a
 separate chunk that is never fetched while the flag is off, and the core entry
 carries none of it.
 
@@ -795,7 +795,7 @@ Run benchmarks: `bun run bench` (navigation timing) / `bun run bench:size` (bund
 
 - `vue` >= 3.4.0
 - `howler` >= 2.2.0 *(optional — only for `vue-micro-router/audio`)*
-- `@vue/devtools-api` >= 6.0.0 *(optional — only for devtools inspector)*
+- `@vue/devtools-api` ^6.0.0 || ^7.0.0 || ^8.0.0 *(optional — only for devtools inspector)*
 
 ## License
 

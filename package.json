@@ -55,7 +55,7 @@
   ],
   "peerDependencies": {
     "vue": "^3.4.0",
-    "@vue/devtools-api": "^6.0.0 || ^7.0.0"
+    "@vue/devtools-api": "^6.0.0 || ^7.0.0 || ^8.0.0"
   },
   "peerDependenciesMeta": {
     "howler": {
@@ -71,7 +71,8 @@
     "@types/howler": "^2.2.12",
     "howler": "^2.2.4",
     "@vitejs/plugin-vue": "^5.0.0",
-    "@vue/devtools-api": "^7.7.0",
+    "@vue/devtools-api": "^8.2.1",
+    "@vue/devtools-kit": "^8.2.1",
     "@vue/test-utils": "^2.4.6",
     "ajv": "^8.18.0",
     "eslint": "^10.2.0",

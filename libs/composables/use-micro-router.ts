@@ -10,6 +10,7 @@
  *   - navigation.activePath → audio (when audio sub-path is used)
  */
 import {
+  getCurrentInstance,
   inject,
   nextTick,
   onBeforeUnmount,
@@ -206,6 +207,13 @@ export function useGlobalMicroRouter(
    * screen — and everything its refs reach — for the life of the page.
    */
   let devtoolsDisposed = false;
+  /**
+   * The app hosting this router, which the devtools plugin must name. Read now:
+   * the component instance is gone by the time the `onMounted` import resolves.
+   * Read whether or not devtools is on: the shorter form keeps the core entry
+   * smaller, and the cost is one property read per router.
+   */
+  const devtoolsApp = getCurrentInstance()?.appContext.app;
 
   // Cross-concern: navigation → controls (gui leave/enter on page change)
   const defaultPage = getLastSegment(config.defaultPath);
@@ -250,12 +258,12 @@ export function useGlobalMicroRouter(
     }
     // Devtools: opt-in, so the inspector is fetched only when asked for and
     // never enters the core bundle. Silently no-ops without @vue/devtools-api.
-    if (config.devtools) {
+    if (config.devtools && devtoolsApp) {
       void import('../devtools/devtools-plugin')
         .then((mod) => {
           if (devtoolsDisposed) return;
           devtools = mod;
-          return mod.setupDevtoolsPlugin(store);
+          return mod.setupDevtoolsPlugin(store, devtoolsApp);
         })
         .catch(() => {
           // A failed chunk fetch (deploy rollover, flaky network) must not

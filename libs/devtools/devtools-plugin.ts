@@ -9,6 +9,8 @@
  * this module ships as its own chunk and the core entry carries none of it.
  * Requires @vue/devtools-api as an optional peer dependency.
  */
+import type { App } from 'vue';
+
 import type { MicroRouterStore } from '../core/types';
 
 const INSPECTOR_ID = 'micro-router-inspector';
@@ -78,6 +80,13 @@ const stores = new Set<MicroRouterStore>();
 let devtoolsApi: DevtoolsApi | null = null;
 /** Guards the one-time plugin registration against a second enabled router. */
 let registered = false;
+/**
+ * Apps the plugin is registered with, and the API handle each registration got.
+ * Registering again under the same id adds a second inspector tab, so a router
+ * that remounts in the same app (a `v-if`, a hot reload) reuses the first one.
+ */
+const registeredApps = new WeakSet<App>();
+const apiByApp = new WeakMap<App, DevtoolsApi>();
 
 /** `r0:`-style prefix so node ids stay unique once several routers report. */
 function storePrefix(index: number): string {
@@ -195,8 +204,12 @@ function inspectorState(nodeId: string): Record<string, unknown> | undefined {
  * Registration with the devtools API happens on the first call only; later
  * routers join the inspector through {@link stores} instead of registering a
  * second plugin under the same ids.
+ *
+ * `app` is the Vue app hosting the router. The devtools kit behind
+ * `@vue/devtools-api` 7 and 8 runs a plugin's setup only for the app its
+ * descriptor names, so a descriptor without it never shows up.
  */
-export async function setupDevtoolsPlugin(store: MicroRouterStore): Promise<void> {
+export async function setupDevtoolsPlugin(store: MicroRouterStore, app: App): Promise<void> {
   stores.add(store);
 
   if (registered) {
@@ -204,7 +217,15 @@ export async function setupDevtoolsPlugin(store: MicroRouterStore): Promise<void
     return;
   }
 
-  let setupDevtools: any;
+  if (registeredApps.has(app)) {
+    registered = true;
+    // Absent until devtools runs the setup callback, which then sets it.
+    devtoolsApi = apiByApp.get(app) ?? null;
+    refreshDevtoolsInspector();
+    return;
+  }
+
+  let setupDevtools: typeof import('@vue/devtools-api').setupDevtoolsPlugin | undefined;
   try {
     // Dynamic import — @vue/devtools-api is an optional peer dependency
     const mod = await import(/* @vite-ignore */ '@vue/devtools-api');
@@ -221,16 +242,19 @@ export async function setupDevtoolsPlugin(store: MicroRouterStore): Promise<void
 
   if (!setupDevtools) return;
   registered = true;
+  registeredApps.add(app);
 
   setupDevtools(
     {
       id: 'vue-micro-router',
       label: 'Micro Router',
       packageName: 'vue-micro-router',
-      homepage: 'https://github.com/danh121097/vue-micro-router'
+      homepage: 'https://github.com/danh121097/vue-micro-router',
+      app
     },
     (api: DevtoolsApi) => {
       devtoolsApi = api;
+      apiByApp.set(app, api);
 
       api.addInspector({
         id: INSPECTOR_ID,
@@ -271,8 +295,9 @@ export function teardownDevtoolsPlugin(store: MicroRouterStore): void {
     return;
   }
 
-  // Nothing is reporting any more, so drop the API handle rather than hold it —
-  // and let a router mounted later register again from a clean slate.
+  // Nothing is reporting any more, so drop the API handle rather than hold it.
+  // A router mounted later in another app registers again; one in this app
+  // picks the registration back up through `registeredApps`.
   devtoolsApi = null;
   registered = false;
 }

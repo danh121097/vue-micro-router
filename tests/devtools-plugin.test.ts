@@ -10,8 +10,19 @@
  * code never reached — rather than at anything internal to the library.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { callDevToolsPluginSetupFn } from '@vue/devtools-kit';
+import { mount } from '@vue/test-utils';
+import { defineComponent, h, ref, type App } from 'vue';
 
-import { cleanupRouters, createPage, flush, mountRouter } from './support/router-test-utils';
+import MicroRouterView from '../libs/components/MicroRouterView.vue';
+
+import {
+  cleanupRouters,
+  createPage,
+  flush,
+  mountRouter,
+  type MountedRouter
+} from './support/router-test-utils';
 
 const STEP_DELAY = 30;
 
@@ -19,6 +30,7 @@ interface PluginDescriptor {
   id: string;
   label: string;
   packageName: string;
+  app?: App;
 }
 
 /** Everything the library asked the devtools API to do, in order. */
@@ -33,6 +45,9 @@ interface ApiCalls {
 
 let calls: ApiCalls;
 
+/** The Vue app devtools is inspecting: the one the last mounted router lives in. */
+let activeApp: App | null = null;
+
 function resetCalls() {
   calls = { descriptors: [], inspectors: [], timelineLayers: [], timelineEvents: [] };
 }
@@ -42,7 +57,10 @@ function resetCalls() {
  *
  * The real `setupDevtoolsPlugin` only runs its callback once a devtools client
  * connects, which never happens headlessly — so the callback would never fire
- * and every assertion below would be vacuous. This runs it immediately.
+ * and every assertion below would be vacuous. This runs it immediately, through
+ * the devtools kit's own `callDevToolsPluginSetupFn`: the kit skips any plugin
+ * whose descriptor names a different `app` than the one it inspects, so a
+ * descriptor without `app` never gets its callback, as in a real browser.
  */
 const fakeApi = {
   addInspector: (options: Record<string, unknown>) => calls.inspectors.push(options),
@@ -66,7 +84,10 @@ beforeAll(async () => {
     ...realModule,
     setupDevtoolsPlugin: (descriptor: PluginDescriptor, cb: (api: unknown) => void) => {
       calls.descriptors.push(descriptor);
-      cb(fakeApi);
+      callDevToolsPluginSetupFn(
+        [descriptor as Parameters<typeof callDevToolsPluginSetupFn>[0][0], () => cb(fakeApi)],
+        activeApp!
+      );
     }
   }));
 });
@@ -87,13 +108,24 @@ const routes = [
   { path: 'detail', component: createPage('detail') }
 ];
 
+/** The Vue app a mounted router lives in. */
+function appOf(r: MountedRouter): App {
+  return r.wrapper.vm.$.appContext.app;
+}
+
+/** Let the dynamic import and its promise chain settle. */
+async function settle() {
+  await flush(4);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  await flush(2);
+}
+
 /** Mount, then let the dynamic import and its promise chain settle. */
 async function mountAndSettle(devtools?: boolean) {
   resetCalls();
   const r = mountRouter({ routes, stepDelay: STEP_DELAY, devtools });
-  await flush(4);
-  await new Promise((resolve) => setTimeout(resolve, 20));
-  await flush(2);
+  activeApp = appOf(r);
+  await settle();
   return r;
 }
 
@@ -120,6 +152,14 @@ describe('devtools opt-in', () => {
     expect(calls.descriptors[0]!.packageName).toBe('vue-micro-router');
     expect(calls.inspectors.map((i) => i.id)).toEqual(['micro-router-inspector']);
     expect(calls.timelineLayers.map((l) => l.id)).toEqual(['micro-router-events']);
+  });
+
+  test('registers against the Vue app that hosts the router', async () => {
+    const r = await mountAndSettle(true);
+
+    // `PluginDescriptor.app` is required by `@vue/devtools-api` 6, 7 and 8; the
+    // devtools kit drops a plugin whose `app` is not the app it inspects.
+    expect(calls.descriptors[0]!.app).toBe(appOf(r));
   });
 });
 
@@ -171,12 +211,11 @@ describe('devtools lifecycle', () => {
   test('a router unmounted before the import resolves never registers', async () => {
     resetCalls();
     const r = mountRouter({ routes, stepDelay: STEP_DELAY, devtools: true });
+    activeApp = appOf(r);
     // Unmount inside the dynamic-import window, before the `.then` can run.
     r.wrapper.unmount();
 
-    await flush(4);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    await flush(2);
+    await settle();
 
     // Registering here would strand the unmounted store — and everything its
     // refs reach — inside the inspector closure for the life of the page.
@@ -200,12 +239,52 @@ describe('devtools lifecycle', () => {
     expect(after.rootNodes).toHaveLength(0);
   });
 
+  test('a router remounted in the same app reuses the registration', async () => {
+    resetCalls();
+    // A `v-if` around the router, or a hot reload: same app, new router.
+    const show = ref(true);
+    const Host = defineComponent({
+      setup: () => () =>
+        show.value
+          ? h(MicroRouterView, {
+              config: {
+                defaultPath: 'home',
+                defaultControlName: 'main_gui',
+                stepDelay: STEP_DELAY,
+                devtools: true
+              },
+              plugins: [{ name: 'test', routes }]
+            })
+          : null
+    });
+    const wrapper = mount(Host, { attachTo: document.body });
+    try {
+      activeApp = wrapper.vm.$.appContext.app;
+      await settle();
+      expect(calls.inspectors).toHaveLength(1);
+
+      show.value = false;
+      await flush(2);
+      show.value = true;
+      await settle();
+
+      // A second registration under the same id is a second inspector tab.
+      expect(calls.descriptors).toHaveLength(1);
+      expect(calls.inspectors).toHaveLength(1);
+      expect(calls.timelineLayers).toHaveLength(1);
+
+      const payload: Record<string, unknown> = { inspectorId: 'micro-router-inspector' };
+      calls.getInspectorTree!(payload);
+      expect(payload.rootNodes).toHaveLength(3);
+    } finally {
+      wrapper.unmount();
+    }
+  });
+
   test('a second enabled router joins the inspector instead of re-registering', async () => {
     await mountAndSettle(true);
     mountRouter({ routes, stepDelay: STEP_DELAY, devtools: true });
-    await flush(4);
-    await new Promise((resolve) => setTimeout(resolve, 20));
-    await flush(2);
+    await settle();
 
     // One plugin, one inspector, one timeline layer — registering a second set
     // under the same ids is what made the tree describe only the last router.

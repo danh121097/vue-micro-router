@@ -31,7 +31,7 @@ This includes page slide/fade transitions, dialog animations, control fade trans
 
 - `vue` >= 3.4.0
 - `howler` >= 2.2.0 *(optional — only for `vue-micro-router/audio`)*
-- `@vue/devtools-api` >= 6.0.0 *(optional — only for the devtools inspector)*
+- `@vue/devtools-api` ^6.0.0 || ^7.0.0 || ^8.0.0 *(optional — only for the devtools inspector)*
 
 ## Entry points
 
