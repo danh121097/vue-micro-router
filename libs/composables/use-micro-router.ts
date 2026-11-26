@@ -93,6 +93,8 @@ export function useGlobalMicroRouter(
     ? useAudioManager({
         volumeRef: config.volumeRef,
         defaultBgm: config.defaultBgm,
+        bgmStartRef: config.bgmStartRef,
+        gate: config.audioGate
       })
     : null;
 
@@ -233,15 +235,8 @@ export function useGlobalMicroRouter(
   });
 
   // Audio: BGM updated inline in push/stepWisePush/stepWiseBack (user gesture context).
-  // For initial default BGM: watch bgmStartRef with flush:'sync' so playSound runs
-  // synchronously WITHIN the user gesture handler that sets bgmStartRef.value = true.
-  if (audio && config.defaultBgm && config.bgmStartRef) {
-    watch(config.bgmStartRef, (ready) => {
-      if (ready && !audio.isStarted()) {
-        audio.playSoundSync(config.defaultBgm!, true);
-      }
-    }, { flush: 'sync' });
-  }
+  // The audio manager watches bgmStartRef for the initial default BGM and holds
+  // every sound while audioGate reads false.
 
   // Lifecycle
   onMounted(async () => {

@@ -1,6 +1,36 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 — Unreleased
+
+### Added
+
+- **`audioGate`: hold background music until the app says audio may start.**
+  A new router config option, `MaybeRefOrGetter<boolean>`. `useAudioManager`
+  takes it as `gate`. Browsers refuse an `AudioContext` created before the
+  page's first user gesture, and Chrome logs `The AudioContext was not allowed
+  to start`. Before, a navigation before that gesture created a sound anyway:
+  the router switches to the page's `bgm` after every `push`, `replace` and
+  step-wise navigation, and the app could not stop that. With `audioGate`:
+  - **While it reads false, no sound is created.** The latest play asked for
+    waits: a navigation's `bgm`, `playSound`, `resumeSound` or the
+    `bgmStartRef` start.
+  - **When it turns true, that track starts once.** It takes the path it would
+    have taken without a gate. A `playSound` or navigation waits for the
+    adapter to load, so a gate that opens before `howler` has loaded still
+    plays it. The `bgmStartRef` start plays synchronously, inside the gesture.
+  - **`pauseSound` keeps the waiting track silent when the gate opens.**
+    `resumeSound` then plays that track, not the default BGM, as it would
+    resume a paused track without a gate.
+  - **`stopSound` drops the waiting track and keeps the music off,** also
+    before the gate opens. The `bgmStartRef` start never overrides a stop or
+    any other request; only a later play brings music back.
+- **`useAudioManager` takes `bgmStartRef`.** The default-BGM start that the
+  router ran on `bgmStartRef` now lives in the audio manager, so it can defer
+  to the gate. Router behaviour is unchanged.
+
+Without `audioGate`, music plays exactly as in 1.1.5. No consumer code changes.
+
+## 1.1.5 — 2026-11-25
 
 ### Fixed
 

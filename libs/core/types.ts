@@ -6,7 +6,7 @@
  *   - MicroDialog  → a modal overlay rendered on top of the page stack
  *   - MicroControl → a persistent GUI overlay (e.g. main_gui, inventory)
  */
-import type { AsyncComponentLoader, Component, ComputedRef, Ref } from 'vue';
+import type { AsyncComponentLoader, Component, ComputedRef, MaybeRefOrGetter, Ref } from 'vue';
 
 // ── Navigation Guards ─────────────────────────────────────────────────────────
 
@@ -248,8 +248,25 @@ export interface MicroRouterConfig {
   volumeRef?: Ref<number>;
   /** Default BGM audio path — used as initial track and fallback when route has no bgm field. Example: '/audios/default.mp3' */
   defaultBgm?: string;
-  /** Set to true (in a user gesture handler) to start default BGM. Watched with flush:'sync' to preserve gesture context for autoplay policy. */
+  /**
+   * Set to true to start default BGM. Watched with flush:'sync' to preserve gesture context for autoplay policy:
+   * without `audioGate`, set it in a user gesture handler. With `audioGate`, it may turn true at any time; the start waits for the gate.
+   */
   bgmStartRef?: Ref<boolean>;
+  /**
+   * Whether background music may start now, e.g. "the page has had a user
+   * gesture". Omit to play at once.
+   *
+   * While it reads false, no sound is created. The latest play waits and starts
+   * when this turns true: a navigation's `bgm`, `playSound`, `resumeSound` or
+   * the `bgmStartRef` start. A `pauseSound` keeps the waiting track silent when
+   * the gate opens, until `resumeSound` plays it. A `stopSound` drops it and
+   * keeps the music off until the next play. That holds before the gate opens too.
+   *
+   * Must be reactive (a ref, or a getter reading one) for a held track to
+   * start by itself; a non-reactive gate is only read on the next request.
+   */
+  audioGate?: MaybeRefOrGetter<boolean>;
   /**
    * Vue Devtools inspector and timeline — opt-in, development only.
    *

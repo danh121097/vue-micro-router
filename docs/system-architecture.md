@@ -407,21 +407,62 @@ Abstraction for audio implementations:
 
 ```typescript
 interface AudioAdapter {
-  play(src: string, loop?: boolean): Promise<void>;
+  play(src: string, options: { loop?: boolean; volume?: number }): Promise<void>;
+  playSync?(src: string, options: { loop?: boolean; volume?: number }): void;
   stop(): void;
-  setVolume(volume: number): void;
+  destroy(): void;
+  pause(): void;
+  resume(): void;
+  fade(from: number, to: number, duration: number): void;
+  isPlaying(): boolean;
+  state(): 'unloaded' | 'loading' | 'loaded';
+  cleanup(): void;
 }
 
 // Default: HowlerAdapter (howler.js wrapper)
-// Custom: implement AudioAdapter, substitute at runtime
+// Custom: implement AudioAdapter, pass it to useAudioManager({ adapter })
 ```
 
 ### Integration
 
-- Optional: only loaded if `vue-micro-router/audio` imported
-- Watcher on `navigation.activePath` → `updateBackgroundMusic(route)`
-- Route can specify `bgm?: string` for per-page music
-- Audio manager accessible via store when imported
+- On only when the router config has `volumeRef`. The router then builds its
+  audio manager with `volumeRef`, `defaultBgm`, `bgmStartRef` and
+  `audioGate` (as the manager's `gate`). It always uses the default
+  `HowlerAdapter`.
+- `push`, `replace`, `stepWisePush` and `stepWiseBack` call
+  `updateBackgroundMusic(activePath)` after the navigation, inline, so the
+  call stays in the user gesture that started it.
+- Route can specify `bgm?: string` for per-page music; `defaultBgm` is the
+  fallback
+- The audio manager watches `bgmStartRef` (flush `sync`) and starts
+  `defaultBgm` when it turns true, unless a sound already plays
+- Audio manager accessible via store (`playSound`, `stopSound`, `pauseSound`,
+  `resumeSound`, `updateBackgroundMusic`)
+
+### Start gate (`audioGate`)
+
+A browser refuses an `AudioContext` created before the page's first user
+gesture, and Howler creates one with its first `Howl`. `audioGate` lets the app
+say when a sound may start. Implemented in `use-audio-manager.ts`.
+
+- While the gate reads false, a play only records itself as `held`; the
+  latest wins. This covers a navigation, `playSound`, `playSoundSync`,
+  `resumeSound` and the `bgmStartRef` start. Nothing reaches the adapter, so
+  no `Howl` exists.
+- A sync watcher on the gate plays the held track when the gate turns true,
+  by the path the request came by: a `playSound` (navigation included) goes
+  back through `playSound`, which waits for the adapter's `howler` import;
+  a `playSoundSync` or `bgmStartRef` start goes through `playSoundSync`,
+  inside the gesture that opened the gate.
+- `pauseSound` marks the held track `paused`: opening the gate leaves it
+  silent. `resumeSound` clears the mark and plays it once the gate is open,
+  instead of its usual fallback to `defaultBgm`.
+- `stopSound` clears `held` and sets `keptOff`. The `bgmStartRef` start does
+  nothing while `keptOff` is set or a request is held; any play clears it.
+- Vue does not promise the order of two sync watchers fed by one source, such
+  as a gate and a `bgmStartRef` derived from the same "unlocked" flag. So the
+  `bgmStartRef` start also releases a held track when it sees the gate open.
+- Without a gate, `held` and `keptOff` never take effect: 1.1.5 behaviour.
 
 ---
 

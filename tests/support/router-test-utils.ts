@@ -27,6 +27,7 @@ import type {
   MicroControl,
   MicroDialog,
   MicroRoute,
+  MicroRouterConfig,
   MicroRouterStore,
   PageTrackerHooks
 } from '../../libs/core/types';
@@ -57,6 +58,8 @@ export interface MountRouterOptions {
   gesture?: GestureConfig;
   /** Analytics hooks; omit to leave the tracker absent. */
   tracker?: PageTrackerHooks;
+  /** Built-in background music options; omit to leave audio off. */
+  audio?: Pick<MicroRouterConfig, 'volumeRef' | 'defaultBgm' | 'bgmStartRef' | 'audioGate'>;
   /** Global mixins — pass `createUpdateCounter().mixin` to tally re-renders. */
   mixins?: ComponentOptions[];
 }
@@ -113,6 +116,7 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
     devtools,
     gesture,
     tracker,
+    audio,
     mixins = []
   } = options;
 
@@ -135,7 +139,8 @@ export function mountRouter(options: MountRouterOptions = {}): MountedRouter {
         ...(stepDelay ? { stepDelay } : {}),
         ...(devtools === undefined ? {} : { devtools }),
         ...(gesture === undefined ? {} : { gesture }),
-        ...(tracker === undefined ? {} : { tracker })
+        ...(tracker === undefined ? {} : { tracker }),
+        ...audio
       },
       plugins: [plugin],
       nested
